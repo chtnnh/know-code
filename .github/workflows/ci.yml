@@ -19,9 +19,14 @@ jobs:
       - run: npm test
       - name: CLI smoke
         run: |
+          set -euo pipefail
           node packages/cli/dist/index.js init --level lite
           node packages/cli/dist/index.js status --json
-          node packages/cli/dist/index.js check || test $? -eq 2
+          set +e
+          node packages/cli/dist/index.js check
+          code=$?
+          set -e
+          test "$code" -eq 2
           HASH=$(node packages/cli/dist/index.js hash)
           node packages/cli/dist/index.js pass --level lite --hash "$HASH"
           node packages/cli/dist/index.js check
