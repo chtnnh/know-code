@@ -4,41 +4,38 @@
 
 Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commit`, `git push`, and PR creation until the **human** passes a comprehension quiz about the diff. Three difficulty levels. Works with Claude Code, Cursor, Codex, Zed, and plain terminals.
 
+**Docs:** [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org)
+
 ## How it works
 
-1. **Skill** — the host agent diffs your index (HEAD + staged) and writes level-appropriate questions.
-2. **Browser quiz** — `know-code ask` opens a local form with a **dedicated textarea per answer** (not the agent chat). The agent grades the submitted answers.
+1. **Skill** — the host agent diffs your index and writes level-appropriate questions.
+2. **Browser quiz** — `know-code ask` opens a local form (not the agent chat).
 3. **CLI receipt** — on pass, `know-code pass` writes `.know-code/gate.json` keyed to a content hash of the patch.
-4. **Git hooks** — `pre-commit` and `pre-push` run `know-code check`.
-5. **Agent hooks** — Claude / Cursor / Codex deny `git commit` / `git push` / `gh pr create` and redirect to the skill.
-6. **CI** — verifies a `Know-Code-Verified: <hash>` commit trailer on pull requests.
+4. **Git + agent hooks** — deny commit / push / PR create until the receipt matches.
+5. **CI** — verifies a `Know-Code-Verified: <hash>` trailer on PRs and pushes to `main`.
 
 ```text
-teach (before edits) → implement → hook deny?
-                ↓
-          know-code-teach (unless skipped) → quiz.json → know-code ask
-                ↓
-          grade → know-code pass → know-code commit -m "…" → push
+teach → implement → quiz (browser) → know-code pass → know-code commit → push
 ```
 
 ## Install
 
 ```bash
-# CLI
+# CLI (preferred after publish)
+npm i -g know-code
+
+# Fallback before / without npm
 npm i -g github:chtnnh/know-code#main:packages/cli
 
-# In your repo
-know-code init --level standard --agents claude,cursor,codex
-
-# Skills (Claude Code, Cursor, Codex, Zed, …)
+know-code init --level standard --agents claude,cursor,codex --workflow
 npx skills add chtnnh/know-code
 ```
 
-This repository keeps skills under `skills/` and links them into `.agents/skills/` (committed). After `npm install`, `prepare` also links Cursor/Claude skill dirs locally and syncs hooks into the CLI package for publish.
+`init --workflow` adds a GitHub Actions workflow that uses [`chtnnh/know-code/action@v0.1.2`](./action).
 
 ### Zed
 
-Zed has no PreToolUse-style shell hooks. Rely on `know-code init` (git `pre-push`) plus the skill under `.agents/skills/`.
+Zed has no PreToolUse-style shell hooks. Rely on git hooks from `know-code init` plus the skill under `.agents/skills/`.
 
 ## Levels
 
@@ -48,86 +45,38 @@ Zed has no PreToolUse-style shell hooks. Rely on `know-code init` (git `pre-push
 | `standard` | 4–6 | Architecture + trade-offs (default) |
 | `deep` | 7–10 | Failure modes, security, migrations |
 
-```bash
-know-code init --level deep
-# or
-export KNOW_CODE_LEVEL=lite
-```
-
 ## CLI
 
 ```bash
-know-code init [--level …] [--base-branch main] [--agents claude,cursor,codex]
+know-code init [--level …] [--base-branch main] [--agents …] [--workflow]
 know-code status [--json]
 know-code hash [--json]
-know-code check          # exit 0 allow / 2 block (commit + push)
+know-code check
 know-code pass --level standard --hash <diffHash>
-know-code ask [--quiz .know-code/quiz.json]   # browser answer form
-know-code commit -m "msg"   # commit + Know-Code-Verified trailer (use this, not git commit)
-know-code verify         # CI trailer check
+know-code ask [--quiz .know-code/quiz.json] [--timeout 1800]
+know-code commit -m "msg"   # use this — adds Know-Code-Verified trailer
+know-code verify
 ```
 
-Emergency bypass (logged):
+Emergency bypass (local only; logged to `.know-code/override.log`):
 
 ```bash
 KNOW_CODE_OVERRIDE=1 git commit
 KNOW_CODE_OVERRIDE=1 git push
 ```
 
-## Complementary skill: know-code-teach
-
-Use **know-code-teach** before/while coding so the quiz is not your first exposure to the design. It explains intent, touch map, trade-offs, and risks — and never opens the gate.
-
-Ideal loop: teach → implement → teach deltas → **know-code** quiz → push.
-
-## CI gate
-
-PRs to this repo run [`.github/workflows/know-code.yml`](.github/workflows/know-code.yml), which requires a matching commit trailer:
-
-```text
-Know-Code-Verified: <diffHash from know-code hash>
-```
-
-After a local quiz pass:
-
-```bash
-know-code pass --level standard --hash "$(know-code hash)"
-HASH=$(know-code hash)
-git commit --amend -m "$(git log -1 --format=%B | sed -e '/^Know-Code-Verified:/d')
-
-Know-Code-Verified: ${HASH}"
-```
-
-Consumers can reuse the composite action:
+## CI for your repo
 
 ```yaml
-# .github/workflows/know-code.yml
-name: know-code
-on: pull_request
-jobs:
-  verify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: chtnnh/know-code/action@main
-        with:
-          base-branch: main
+# written by: know-code init --workflow
+- uses: actions/checkout@v4
+  with: { fetch-depth: 0 }
+- uses: chtnnh/know-code/action@v0.1.2
+  with:
+    base-branch: main
 ```
 
-Mark **know-code / verify** as a required status check in branch protection.
-
-## Repo layout
-
-```text
-skills/                     # skill source (know-code, know-code-teach)
-.agents/skills/             # committed symlinks → skills/
-hooks/                      # check-shell.sh + agent hook fragments (single copy)
-packages/cli/               # TypeScript CLI (hooks/ synced on prepare/publish)
-action/                     # composite GitHub Action
-scripts/                    # link-skills.mjs, sync-hooks.mjs
-```
+Mark **know-code** as a required status check. Helper: `node scripts/setup-branch-protection.mjs owner/repo main`.
 
 ## Development
 
@@ -136,11 +85,17 @@ npm install   # links skills + syncs hooks into packages/cli
 npm run build
 npm test
 npm run know-code -- status
+npm run build -w website   # docs site
 ```
 
-## Prior art
+## Publish checklist (maintainers)
 
-Inspired by OwnDiff, Pushback, and proctor-skill — portable skills + content-hash receipts + layered enforcement.
+1. Public GitHub repo  
+2. Pages: source = GitHub Actions; DNS `kc` CNAME → `chtnnh.github.io`  
+3. Set `NPM_TOKEN` secret; tag `v0.1.2` to run [`.github/workflows/release.yml`](.github/workflows/release.yml)  
+4. Smoke install from npm + Action on a fresh repo  
+
+See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

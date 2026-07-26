@@ -22,3 +22,5 @@ This repository dogfoods its own gate.
 - **know-code** — quiz in browser; `know-code pass`; ship via `know-code commit`
 
 CLI from this checkout: `npm run know-code -- …`
+
+Docs: https://kc.chtnnhfoundation.org

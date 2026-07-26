@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Shared gate for agent shell hooks. Reads JSON on stdin (Claude/Cursor/Codex).
 # Denies git commit / push / PR creation when know-code check fails.
+# Only the parsed command field is gated — never the raw stdin blob (avoids
+# false positives when quiz text / heredocs mention "git commit").
 set -euo pipefail
 
 INPUT="$(cat || true)"
@@ -17,14 +19,20 @@ CMD="$(
   ' 2>/dev/null || true
 )"
 
-# If Cursor matches the outer agent shell string but stdin has no command field,
-# fall back to scanning the raw stdin / env for gated verbs.
+# No structured command → allow (do not scan raw stdin for substrings).
 if [[ -z "$CMD" ]]; then
-  CMD="$INPUT"
+  if [[ -n "${KNOW_CODE_HOOK_FORMAT:-}" ]]; then
+    case "${KNOW_CODE_HOOK_FORMAT}" in
+      cursor) echo '{"permission":"allow"}' ;;
+      *) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
+    esac
+  fi
+  exit 0
 fi
 
 should_gate() {
   local c="$1"
+  # Align with packages/cli/src/gate-cmd.ts shouldGate() — parsed command only.
   [[ "$c" =~ git[[:space:]]+commit ]] && return 0
   [[ "$c" =~ git[[:space:]]+push ]] && return 0
   [[ "$c" =~ gh[[:space:]]+pr[[:space:]]+create ]] && return 0
@@ -53,6 +61,14 @@ deny_json() {
       exit 2
       ;;
   esac
+}
+
+log_override() {
+  local root snippet
+  root="$(resolve_root)"
+  mkdir -p "$root/.know-code"
+  snippet="$(printf '%s' "$CMD" | head -c 200 | tr '\n' ' ')"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) override cmd=${snippet}" >> "$root/.know-code/override.log"
 }
 
 resolve_root() {
@@ -97,6 +113,7 @@ if ! should_gate "$CMD"; then
 fi
 
 if [[ "${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
+  log_override
   allow_json
   exit 0
 fi

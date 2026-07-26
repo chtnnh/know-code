@@ -4,7 +4,7 @@
     "beforeShellExecution": [
       {
         "command": "KNOW_CODE_HOOK_FORMAT=cursor bash hooks/check-shell.sh",
-        "matcher": "git commit|git push|gh pr create|glab mr create"
+        "matcher": "(^|[;|&\\n]\\s*)(git\\s+(commit|push)\\b|gh\\s+pr\\s+create\\b|glab\\s+mr\\s+create\\b)"
       }
     ]
   }

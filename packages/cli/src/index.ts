@@ -12,10 +12,10 @@ const HELP = `know-code — block commit/push/PR until you can explain the diff
 
 Usage:
   know-code init [--level lite|standard|deep] [--base-branch main]
-                 [--agents claude,cursor,codex] [--require-trailer]
+                 [--agents claude,cursor,codex] [--require-trailer] [--workflow]
   know-code check
   know-code pass [--level lite|standard|deep] [--hash <diffHash>]
-  know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--no-open]
+  know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--timeout 1800] [--no-open]
   know-code commit -m "<message>" [--no-trailer] [--] [git commit args...]
   know-code status [--json]
   know-code hash [--json]
@@ -23,11 +23,12 @@ Usage:
   know-code help
 
 Environment:
-  KNOW_CODE_LEVEL       Override quiz level
-  KNOW_CODE_OVERRIDE=1  Bypass gate once (logged)
-  KNOW_CODE_QUIZ_PORT   Port for browser quiz UI (default 3847)
+  KNOW_CODE_LEVEL         Override quiz level
+  KNOW_CODE_OVERRIDE=1    Bypass gate once (appends .know-code/override.log)
+  KNOW_CODE_QUIZ_PORT     Port for browser quiz UI (default 3847)
+  KNOW_CODE_QUIZ_TIMEOUT  Quiz wait seconds (default 1800)
 
-Docs: https://github.com/chtnnh/know-code
+Docs: https://kc.chtnnhfoundation.org
 `;
 
 function parseArgs(argv: string[]): {
@@ -73,6 +74,7 @@ function main(): void {
               : undefined,
           agents: typeof flags.agents === "string" ? flags.agents : undefined,
           requireTrailer: flags["require-trailer"] === true,
+          workflow: flags.workflow === true,
         });
         break;
       case "check":
@@ -97,6 +99,7 @@ function main(): void {
         void cmdAsk({
           quiz: typeof flags.quiz === "string" ? flags.quiz : undefined,
           port: typeof flags.port === "string" ? flags.port : undefined,
+          timeout: typeof flags.timeout === "string" ? flags.timeout : undefined,
           noOpen: flags["no-open"] === true,
         }).catch((err) => {
           console.error(`know-code: ${err instanceof Error ? err.message : err}`);
@@ -114,7 +117,7 @@ function main(): void {
       case "version":
       case "--version":
       case "-v":
-        console.log("0.1.0");
+        console.log("0.1.2");
         break;
       default:
         console.error(`Unknown command: ${command}\n`);

@@ -1,5 +1,8 @@
 name: know-code verify
-description: Verify Know-Code-Verified commit trailers match the PR diff hash
+description: >-
+  Verify Know-Code-Verified commit trailers. Primary check: HEAD message
+  matches the current tree hash (empty-tree→index). Secondary: trailers on
+  commits ahead of the base branch. Use on pull_request and push to main.
 author: chtnnh
 branding:
   icon: shield
@@ -14,6 +17,10 @@ inputs:
     description: If true, fail when no matching trailer is present (stricter messaging)
     required: false
     default: "false"
+  version:
+    description: npm version range for know-code when not building from this repo
+    required: false
+    default: "^0.1.2"
 
 runs:
   using: composite
@@ -37,7 +44,7 @@ runs:
           npm run build --prefix "$ROOT/packages/cli"
           npm install -g "$ROOT/packages/cli"
         else
-          npm install -g know-code@^0.1.0
+          npm install -g "know-code@${{ inputs.version }}"
         fi
 
     - name: Ensure config

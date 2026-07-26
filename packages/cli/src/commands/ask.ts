@@ -225,6 +225,8 @@ export async function cmdAsk(opts: {
   quiz?: string;
   port?: string;
   noOpen?: boolean;
+  /** Seconds to wait for browser submit; default 1800 (30m). */
+  timeout?: string;
 }): Promise<void> {
   const repoRoot = findGitRoot();
   const quizPath =
@@ -237,6 +239,9 @@ export async function cmdAsk(opts: {
 
   const quiz = loadQuiz(quizPath);
   const port = Number(opts.port || process.env.KNOW_CODE_QUIZ_PORT || "3847");
+  const timeoutSec = Number(
+    opts.timeout || process.env.KNOW_CODE_QUIZ_TIMEOUT || "1800",
+  );
   let settled = false;
 
   const result = await new Promise<QuizResult>((resolve, reject) => {
@@ -245,6 +250,7 @@ export async function cmdAsk(opts: {
         await handle(req, res, quiz, (answers) => {
           if (settled) return;
           settled = true;
+          clearTimeout(timer);
           const payload: QuizResult = {
             diffHash: quiz.diffHash,
             level: quiz.level,
@@ -260,11 +266,27 @@ export async function cmdAsk(opts: {
       }
     });
 
-    server.on("error", reject);
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      server.close();
+      reject(
+        new Error(
+          `Quiz timed out after ${timeoutSec}s with no submission. Re-run know-code ask.`,
+        ),
+      );
+    }, Math.max(1, timeoutSec) * 1000);
+    timer.unref?.();
+
+    server.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
     server.listen(port, "127.0.0.1", () => {
       const url = `http://127.0.0.1:${port}/`;
       console.error(`know-code: quiz UI at ${url}`);
       console.error("know-code: answer in the browser form (not the agent chat).");
+      console.error(`know-code: timeout ${timeoutSec}s`);
       if (!opts.noOpen) openBrowser(url);
     });
   });

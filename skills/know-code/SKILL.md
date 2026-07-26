@@ -11,7 +11,7 @@ description: >-
 compatibility: "requires git, node>=20, know-code CLI; browser preferred for quiz UI"
 metadata:
   author: chtnnh
-  version: "0.1.3"
+  version: "0.1.4"
 license: MIT
 ---
 
@@ -110,6 +110,8 @@ Then push when asked / when shipping.
 
 ```bash
 npm i -g know-code
-know-code init --level standard --agents claude,cursor,codex
+know-code init --level standard --agents claude,cursor,codex --workflow
 npx skills add chtnnh/know-code
 ```
+
+Docs: https://kc.chtnnhfoundation.org

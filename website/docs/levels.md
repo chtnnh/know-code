@@ -1,0 +1,20 @@
+---
+sidebar_position: 5
+title: Levels
+---
+
+# Levels
+
+| Level | Questions | Focus |
+|-------|-----------|-------|
+| `lite` | 2–3 | What changed |
+| `standard` | 4–6 | Architecture + trade-offs (default) |
+| `deep` | 7–10 | Failure modes, security, migrations |
+
+```bash
+know-code init --level deep
+# or
+export KNOW_CODE_LEVEL=lite
+```
+
+Pass bar is **≥80%** solidly correct answers relative to the real diff. Vague hand-waving fails even if keywords match.

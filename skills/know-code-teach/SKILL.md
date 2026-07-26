@@ -9,7 +9,7 @@ description: >-
 compatibility: "works in any agentskills.io harness"
 metadata:
   author: chtnnh
-  version: "0.1.1"
+  version: "0.1.2"
 license: MIT
 ---
 

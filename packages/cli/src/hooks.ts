@@ -8,7 +8,10 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CURSOR_MATCHER } from "./gate-cmd.js";
 import { gitHooksDir } from "./paths.js";
+
+export { CURSOR_MATCHER } from "./gate-cmd.js";
 
 const HOOK_MARKER = "# know-code gate";
 
@@ -38,7 +41,7 @@ if [[ "\${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
   echo "know-code: KNOW_CODE_OVERRIDE=1 — allowing (logged)." >&2
   ROOT="\$(git rev-parse --show-toplevel)"
   mkdir -p "\$ROOT/.know-code"
-  echo "know-code: override at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "\$ROOT/.know-code/override.log"
+  echo "\$(date -u +%Y-%m-%dT%H:%M:%SZ) git-hook override" >> "\$ROOT/.know-code/override.log"
   exit 0
 fi
 
@@ -101,9 +104,6 @@ export function installGitPreCommit(repoRoot: string) {
 }
 
 export type AgentId = "claude" | "cursor" | "codex";
-
-const CURSOR_MATCHER =
-  "git commit|git push|gh pr create|glab mr create";
 
 function installCheckScript(repoRoot: string): string {
   const committed = join(repoRoot, "hooks", "check-shell.sh");

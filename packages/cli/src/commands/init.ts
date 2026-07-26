@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { readConfig, writeConfig } from "../config.js";
 import {
   installAgentHooks,
@@ -10,11 +10,37 @@ import {
 import { findGitRoot, knowCodeDir } from "../paths.js";
 import { DEFAULT_CONFIG, isLevel, type Config } from "../types.js";
 
+const DOCS = "https://kc.chtnnhfoundation.org";
+const ACTION_REF = "chtnnh/know-code/action@v0.1.2";
+
+export function consumerWorkflowYaml(baseBranch: string): string {
+  return `name: know-code
+
+on:
+  pull_request:
+  push:
+    branches: [${baseBranch}]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ${ACTION_REF}
+        with:
+          base-branch: ${baseBranch}
+`;
+}
+
 export function cmdInit(opts: {
   level?: string;
   baseBranch?: string;
   agents?: string;
   requireTrailer?: boolean;
+  workflow?: boolean;
 }): void {
   const repoRoot = findGitRoot();
 
@@ -73,14 +99,33 @@ export function cmdInit(opts: {
     console.log("");
     console.log("Agent hooks (optional):");
     console.log("  know-code init --agents claude,cursor,codex");
-    console.log("Or copy fragments from the hooks/ directory in the repo.");
+  }
+
+  if (opts.workflow) {
+    const path = join(repoRoot, ".github", "workflows", "know-code.yml");
+    if (existsSync(path)) {
+      console.log(`Workflow already exists → ${path} (left unchanged)`);
+    } else {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, consumerWorkflowYaml(config.baseBranch));
+      console.log(`Wrote CI workflow → ${path}`);
+    }
+  } else {
+    console.log("");
+    console.log("CI workflow (optional):");
+    console.log("  know-code init --workflow");
+    console.log(`  Docs: ${DOCS}/ci`);
   }
 
   console.log("");
   console.log(`Config written → .know-code/config.json (level: ${config.level})`);
-  console.log("Install the skill:");
-  console.log("  npx skills add chtnnh/know-code");
-  console.log("Or symlink skills/know-code into .agents/skills/");
+  console.log("");
+  console.log("Next steps:");
+  console.log("  1. npm i -g know-code   # or: npm i -g github:chtnnh/know-code#main:packages/cli");
+  console.log("  2. npx skills add chtnnh/know-code");
+  console.log("  3. teach → implement → know-code ask (browser quiz) → know-code pass");
+  console.log('  4. know-code commit -m "…"   # adds Know-Code-Verified trailer');
+  console.log(`Docs: ${DOCS}`);
 }
 
 function ensureGitignore(repoRoot: string): void {
