@@ -1,12 +1,17 @@
-// This file is not used by "docusaurus start/build" commands.
-// It is here to improve your IDE experience (type-checking, autocompletion...),
-// and can also run the package.json "typecheck" script manually.
+// IDE / `npm run typecheck` only — Docusaurus build does not use this file.
+// Relative extends so the language service resolves packages hoisted to the
+// monorepo root (website/node_modules does not contain @docusaurus/*).
 {
-  "extends": "@docusaurus/tsconfig",
+  "extends": "../node_modules/@docusaurus/tsconfig/tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "strict": true
   },
-  "exclude": [".docusaurus", "build"]
+  "include": [
+    "docusaurus.config.ts",
+    "sidebars.ts",
+    "src/**/*"
+  ],
+  "exclude": [".docusaurus", "build", "node_modules"]
 }
