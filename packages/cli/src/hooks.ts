@@ -96,7 +96,8 @@ function installCheckScript(repoRoot: string): string {
   }
   copyFileSync(src, dest);
   chmodSync(dest, 0o755);
-  return dest;
+  // Relative path so generated agent configs are portable across machines
+  return ".know-code/check-shell.sh";
 }
 
 export function installAgentHooks(

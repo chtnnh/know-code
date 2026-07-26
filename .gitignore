@@ -8,3 +8,8 @@ dist/
 .env.*
 coverage/
 .turbo/
+
+# Local agent hook installs from `know-code init --agents` (machine-specific)
+.claude/settings.json
+.cursor/hooks.json
+.codex/hooks.json
