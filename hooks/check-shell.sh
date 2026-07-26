@@ -17,6 +17,12 @@ CMD="$(
   ' 2>/dev/null || true
 )"
 
+# If Cursor matches the outer agent shell string but stdin has no command field,
+# fall back to scanning the raw stdin / env for gated verbs.
+if [[ -z "$CMD" ]]; then
+  CMD="$INPUT"
+fi
+
 should_gate() {
   local c="$1"
   [[ "$c" =~ git[[:space:]]+commit ]] && return 0
@@ -49,21 +55,35 @@ deny_json() {
   esac
 }
 
+resolve_root() {
+  local script_dir root
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$script_dir/../packages/cli/dist/index.js" ]]; then
+    cd "$script_dir/.." && pwd
+    return
+  fi
+  if root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    printf '%s\n' "$root"
+    return
+  fi
+  pwd
+}
+
 run_check() {
+  local root
+  root="$(resolve_root)"
+  cd "$root" || return 127
+
+  if [[ -f "$root/packages/cli/dist/index.js" ]]; then
+    node "$root/packages/cli/dist/index.js" check
+    return $?
+  fi
+  if [[ -x "$root/node_modules/.bin/know-code" ]]; then
+    "$root/node_modules/.bin/know-code" check
+    return $?
+  fi
   if command -v know-code >/dev/null 2>&1; then
     know-code check
-    return $?
-  fi
-  if [[ -x "node_modules/.bin/know-code" ]]; then
-    "node_modules/.bin/know-code" check
-    return $?
-  fi
-  if [[ -f "packages/cli/dist/index.js" ]]; then
-    node "packages/cli/dist/index.js" check
-    return $?
-  fi
-  if command -v npx >/dev/null 2>&1; then
-    npx --yes know-code check
     return $?
   fi
   return 127
