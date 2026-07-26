@@ -1,9 +1,10 @@
 name: release
 
 # Publishes @chtnnh/know-code via npm Trusted Publishing (OIDC).
-# Configure on npmjs.com → package → Trusted Publisher:
-#   GitHub → chtnnh/know-code → workflow filename: release.yml
-# No NPM_TOKEN secret required.
+# On npmjs.com → @chtnnh/know-code → Trusted Publisher:
+#   Repository: chtnnh/know-code
+#   Workflow filename: release.yml   (filename only, not a path)
+# No NPM_TOKEN / NODE_AUTH_TOKEN — those block OIDC.
 on:
   push:
     tags:
@@ -19,27 +20,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Node 24 ships npm ≥ 11.5.1 (required for trusted publishing).
-      # Do not set NODE_AUTH_TOKEN — an empty _authToken breaks OIDC.
+      # Node 24 → npm ≥ 11.5.1 (required for trusted publishing).
+      # Do NOT set registry-url: setup-node would inject a dummy NODE_AUTH_TOKEN
+      # that prevents the OIDC exchange (ENEEDAUTH).
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
-      - name: Prefer OIDC over empty setup-node authToken
-        run: |
-          cfg="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
-          if [[ -f "$cfg" ]]; then
-            sed -i '/_authToken/d' "$cfg"
-          fi
-          npm --version
-
+      - run: npm --version
       - run: npm install
       - run: npm run build
       - run: npm test
 
       - name: Publish CLI to npm (OIDC)
-        run: npm publish -w @chtnnh/know-code --access public --provenance
+        working-directory: packages/cli
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --access public
 
       - name: Create GitHub Release
         env:
