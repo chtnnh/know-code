@@ -1,0 +1,22 @@
+{
+  "name": "know-code-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "k(no)w-code — agents don't push until you know exactly what's changed",
+  "workspaces": [
+    "packages/cli"
+  ],
+  "scripts": {
+    "build": "npm run build -w know-code",
+    "test": "npm run test -w know-code",
+    "know-code": "node packages/cli/dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chtnnh/know-code.git"
+  }
+}

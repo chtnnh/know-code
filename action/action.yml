@@ -1,0 +1,63 @@
+name: know-code verify
+description: Verify Know-Code-Verified commit trailers match the PR diff hash
+author: chtnnh
+branding:
+  icon: shield
+  color: gray-dark
+
+inputs:
+  base-branch:
+    description: Base branch name used for diff hashing (must match local .know-code/config.json)
+    required: false
+    default: main
+  require-all:
+    description: If true, fail when no matching trailer is present (stricter messaging)
+    required: false
+    default: "false"
+  token:
+    description: GitHub token for checkout
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ inputs.token }}
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Install know-code CLI
+      shell: bash
+      run: |
+        ROOT="${GITHUB_ACTION_PATH}/.."
+        if [[ -f "$ROOT/packages/cli/package.json" ]]; then
+          npm install --prefix "$ROOT/packages/cli"
+          npm run build --prefix "$ROOT/packages/cli"
+          npm install -g "$ROOT/packages/cli"
+        else
+          npm install -g know-code@^0.1.0
+        fi
+
+    - name: Write base-branch config
+      shell: bash
+      run: |
+        mkdir -p .know-code
+        if [[ ! -f .know-code/config.json ]]; then
+          printf '{\n  "level": "standard",\n  "baseBranch": "%s",\n  "requireTrailer": true\n}\n' "${{ inputs.base-branch }}" > .know-code/config.json
+        fi
+
+    - name: Verify Know-Code-Verified trailer
+      shell: bash
+      run: |
+        if [[ "${{ inputs.require-all }}" == "true" ]]; then
+          know-code verify --require-all
+        else
+          know-code verify
+        fi

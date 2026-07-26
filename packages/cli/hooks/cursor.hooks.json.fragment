@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "KNOW_CODE_HOOK_FORMAT=cursor \"${KNOW_CODE_HOOK_SCRIPT:-hooks/check-shell.sh}\"",
+        "matcher": "git push|gh pr create|glab mr create"
+      }
+    ]
+  }
+}

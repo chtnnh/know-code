@@ -1,0 +1,20 @@
+name: know-code
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  verify:
+    # Example workflow for consumers; this repo enables it as optional documentation.
+    # Forks should set this as a required status check after enabling trailers.
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./action
+        with:
+          base-branch: main
+          require-all-commits: "false"
