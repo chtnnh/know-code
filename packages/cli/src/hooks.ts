@@ -45,6 +45,14 @@ if command -v know-code >/dev/null 2>&1; then
   exec know-code check
 fi
 
+ROOT="$(git rev-parse --show-toplevel)"
+if [[ -x "\$ROOT/node_modules/.bin/know-code" ]]; then
+  exec "\$ROOT/node_modules/.bin/know-code" check
+fi
+if [[ -f "\$ROOT/packages/cli/dist/index.js" ]]; then
+  exec node "\$ROOT/packages/cli/dist/index.js" check
+fi
+
 if command -v npx >/dev/null 2>&1; then
   exec npx --yes know-code check
 fi

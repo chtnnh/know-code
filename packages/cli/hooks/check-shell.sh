@@ -5,7 +5,6 @@ set -euo pipefail
 
 INPUT="$(cat || true)"
 
-# Extract command from common hook payload shapes
 CMD="$(
   printf '%s' "$INPUT" | node -e '
     let d=""; process.stdin.on("data",c=>d+=c); process.stdin.on("end",()=>{
@@ -26,56 +25,67 @@ should_gate() {
   return 1
 }
 
+allow_json() {
+  case "${KNOW_CODE_HOOK_FORMAT:-claude}" in
+    cursor) echo '{"permission":"allow"}' ;;
+    *) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
+  esac
+}
+
+deny_json() {
+  local REASON="$1"
+  case "${KNOW_CODE_HOOK_FORMAT:-claude}" in
+    cursor)
+      printf '{"permission":"deny","user_message":%s}\n' "$(node -e "console.log(JSON.stringify(process.argv[1]))" "$REASON")"
+      exit 0
+      ;;
+    *)
+      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' \
+        "$(node -e "console.log(JSON.stringify(process.argv[1]))" "$REASON")"
+      echo "$REASON" >&2
+      exit 2
+      ;;
+  esac
+}
+
+run_check() {
+  if command -v know-code >/dev/null 2>&1; then
+    know-code check
+    return $?
+  fi
+  if [[ -x "node_modules/.bin/know-code" ]]; then
+    "node_modules/.bin/know-code" check
+    return $?
+  fi
+  # Monorepo / linked checkout
+  if [[ -f "packages/cli/dist/index.js" ]]; then
+    node "packages/cli/dist/index.js" check
+    return $?
+  fi
+  if command -v npx >/dev/null 2>&1; then
+    npx --yes know-code check
+    return $?
+  fi
+  return 127
+}
+
 if ! should_gate "$CMD"; then
-  # Allow unrelated commands
   if [[ -n "${KNOW_CODE_HOOK_FORMAT:-}" ]]; then
-    case "$KNOW_CODE_HOOK_FORMAT" in
-      cursor) echo '{"permission":"allow"}' ;;
-      claude) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
-      codex) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
-    esac
+    allow_json
   fi
   exit 0
 fi
 
 if [[ "${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
-  case "${KNOW_CODE_HOOK_FORMAT:-claude}" in
-    cursor) echo '{"permission":"allow"}' ;;
-    *) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
-  esac
+  allow_json
   exit 0
 fi
 
 REASON="know-code: blocked. Run the know-code skill (/know-code), pass the quiz, then retry. Bypass: KNOW_CODE_OVERRIDE=1"
 
-if command -v know-code >/dev/null 2>&1; then
-  if know-code check 2>/dev/null; then
-    case "${KNOW_CODE_HOOK_FORMAT:-claude}" in
-      cursor) echo '{"permission":"allow"}' ;;
-      *) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
-    esac
-    exit 0
-  fi
-elif command -v npx >/dev/null 2>&1; then
-  if npx --yes know-code check 2>/dev/null; then
-    case "${KNOW_CODE_HOOK_FORMAT:-claude}" in
-      cursor) echo '{"permission":"allow"}' ;;
-      *) echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}' ;;
-    esac
-    exit 0
-  fi
+if run_check; then
+  allow_json
+  exit 0
 fi
 
-case "${KNOW_CODE_HOOK_FORMAT:-claude}" in
-  cursor)
-    printf '{"permission":"deny","user_message":%s}\n' "$(node -e "console.log(JSON.stringify(process.argv[1]))" "$REASON")"
-    exit 0
-    ;;
-  *)
-    # Claude / Codex: JSON deny + exit 2 (belt and suspenders)
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' \
-      "$(node -e "console.log(JSON.stringify(process.argv[1]))" "$REASON")"
-    echo "$REASON" >&2
-    exit 2
-    ;;
-esac
+deny_json "$REASON"
