@@ -125,6 +125,25 @@ npm test
 node packages/cli/dist/index.js status
 ```
 
+### Publish (maintainers)
+
+```bash
+# GitHub (already on origin/main after merge)
+git push origin main
+
+# npm — requires npm login with publish rights
+cd packages/cli && npm publish --access public
+
+# Optional: make the GitHub repo public so `npx skills add chtnnh/know-code` works anonymously
+gh repo edit chtnnh/know-code --visibility public
+```
+
+Install from git without npm:
+
+```bash
+npm i -g github:chtnnh/know-code#main:packages/cli
+```
+
 ## Prior art
 
 Inspired by OwnDiff, Pushback, and proctor-skill — portable skills + content-hash receipts + layered enforcement.

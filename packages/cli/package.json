@@ -4,10 +4,11 @@
   "description": "Gate git push / PR creation until the human passes a comprehension quiz about the diff",
   "type": "module",
   "bin": {
-    "know-code": "./dist/index.js"
+    "know-code": "bin/know-code.js"
   },
   "main": "./dist/index.js",
   "files": [
+    "bin",
     "dist",
     "hooks",
     "README.md",
