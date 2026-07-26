@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "KNOW_CODE_HOOK_FORMAT=claude bash hooks/check-shell.sh"
+            "command": "KNOW_CODE_HOOK_FORMAT=codex bash hooks/check-shell.sh"
           }
         ]
       }

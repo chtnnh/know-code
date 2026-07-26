@@ -2,6 +2,8 @@
 
 Verifies that a PR carries a `Know-Code-Verified: <diffHash>` commit trailer matching `know-code hash` for the PR head.
 
+Checkout the repo with `fetch-depth: 0` before invoking this action.
+
 ## Usage
 
 ```yaml
@@ -22,13 +24,9 @@ jobs:
 After passing the local quiz:
 
 ```bash
-know-code hash   # copy the hash
-git commit --amend -m "$(cat <<EOF
-$(git log -1 --format=%B | sed -e '/^Know-Code-Verified:/d')
-
-Know-Code-Verified: <hash>
-EOF
-)"
+HASH=$(know-code hash)
+# include in commit message:
+# Know-Code-Verified: $HASH
 ```
 
-Enable this check as required in branch protection for team enforcement.
+Enable **know-code / verify** as a required status check for branch protection.

@@ -6,15 +6,22 @@ on:
 
 jobs:
   verify:
-    # Example workflow for consumers; this repo enables it as optional documentation.
-    # Forks should set this as a required status check after enabling trailers.
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: ./action
+
+      - uses: actions/setup-node@v4
         with:
-          base-branch: main
-          require-all-commits: "false"
+          node-version: "22"
+          cache: npm
+
+      - name: Install and build CLI
+        run: |
+          npm install
+          npm run build
+          npm install -g ./packages/cli
+
+      - name: Verify Know-Code-Verified trailer
+        run: know-code verify

@@ -3,7 +3,7 @@
   "hooks": {
     "beforeShellExecution": [
       {
-        "command": "KNOW_CODE_HOOK_FORMAT=cursor bash .know-code/check-shell.sh",
+        "command": "KNOW_CODE_HOOK_FORMAT=cursor bash hooks/check-shell.sh",
         "matcher": "git push|gh pr create|glab mr create"
       }
     ]

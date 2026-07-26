@@ -97,8 +97,24 @@ know-code pass --level <lite|standard|deep> --hash <diffHash>
 
 ### 7. Resume ship
 
-Tell the human/agent it is safe to retry `git push` / `gh pr create`.  
-Optional: suggest adding commit trailer `Know-Code-Verified: <diffHash>` when CI verification is enabled.
+Tell the human/agent it is safe to retry `git push` / `gh pr create`.
+
+If `.know-code/config.json` has `"requireTrailer": true` (this repo does), help the human add a commit trailer before opening/updating the PR:
+
+```text
+Know-Code-Verified: <diffHash>
+```
+
+Example:
+
+```bash
+HASH=$(know-code hash)
+git commit --amend -m "$(git log -1 --format=%B | sed -e '/^Know-Code-Verified:/d')
+
+Know-Code-Verified: ${HASH}"
+```
+
+CI runs `know-code verify` on pull requests and will fail without a matching trailer.
 
 ## Hard rules
 

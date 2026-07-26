@@ -1,7 +1,6 @@
 node_modules/
 dist/
 *.tsbuildinfo
-.know-code/
 .DS_Store
 *.log
 .env
@@ -9,7 +8,6 @@ dist/
 coverage/
 .turbo/
 
-# Local agent hook installs from `know-code init --agents` (machine-specific)
-.claude/settings.json
-.cursor/hooks.json
-.codex/hooks.json
+# Local gate state — keep shared config committed
+.know-code/*
+!.know-code/config.json

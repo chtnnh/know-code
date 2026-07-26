@@ -15,6 +15,10 @@ export function sha256(input: string): string {
   return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
+/**
+ * Hash is content-addressed from the patch only (not commit SHAs), so
+ * message-only amends / Know-Code-Verified trailers do not invalidate it.
+ */
 export function computeDiffContext(
   repoRoot: string,
   config: Config,
@@ -23,13 +27,9 @@ export function computeDiffContext(
   const headRef = currentHead(repoRoot);
 
   if (headRef === EMPTY_TREE) {
-    const material = [
-      `base:${baseRef}`,
-      `from:${EMPTY_TREE}`,
-      `head:${EMPTY_TREE}`,
-      `log:`,
-      `diff:`,
-    ].join("\n");
+    const material = [`base:${baseRef}`, `from:${EMPTY_TREE}`, `diff:`].join(
+      "\n",
+    );
     return {
       baseRef,
       headRef: EMPTY_TREE,
@@ -54,13 +54,9 @@ export function computeDiffContext(
   }
 
   const commitRange = `${from}..${headRef}`;
-  const material = [
-    `base:${baseRef}`,
-    `from:${from}`,
-    `head:${headRef}`,
-    `log:${log}`,
-    `diff:${diff}`,
-  ].join("\n");
+  const material = [`base:${baseRef}`, `from:${from}`, `diff:${diff}`].join(
+    "\n",
+  );
 
   return {
     baseRef,

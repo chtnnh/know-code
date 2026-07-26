@@ -95,6 +95,13 @@ export function installGitPrePush(repoRoot: string): {
 export type AgentId = "claude" | "cursor" | "codex";
 
 function installCheckScript(repoRoot: string): string {
+  // Prefer a committed repo-root hooks/ script when present (dogfooding / vendored)
+  const committed = join(repoRoot, "hooks", "check-shell.sh");
+  if (existsSync(committed)) {
+    chmodSync(committed, 0o755);
+    return "hooks/check-shell.sh";
+  }
+
   const destDir = join(repoRoot, ".know-code");
   mkdirSync(destDir, { recursive: true });
   const dest = join(destDir, "check-shell.sh");
