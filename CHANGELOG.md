@@ -5,6 +5,7 @@
 ### Package
 - Add `packages/cli/README.md` so the npm package page has documentation
 - `know-code skills [--global]` wraps `npx skills add chtnnh/know-code` for project or user-global skill install
+- Release workflow uses npm Trusted Publishing (OIDC) — no `NPM_TOKEN`
 
 ### Docs
 - Document global skill install (`--global` / harness home dirs)

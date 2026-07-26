@@ -97,7 +97,7 @@ npm run build -w website   # docs site
 
 1. Public GitHub repo  
 2. Pages: source = GitHub Actions; DNS `kc` CNAME → `chtnnh.github.io`  
-3. Publish: `npm publish -w @chtnnh/know-code --access public --otp=…` (or tag `v0.1.2` if `NPM_TOKEN` is set)  
+3. Publish: tag `v*` (e.g. `v0.1.3`) — [release.yml](.github/workflows/release.yml) uses npm **Trusted Publishing** (OIDC), no `NPM_TOKEN`  
 4. Smoke: `npm i -g @chtnnh/know-code` then `know-code --version`  
 
 See [CHANGELOG.md](./CHANGELOG.md).
