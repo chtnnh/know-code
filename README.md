@@ -21,8 +21,9 @@ push/PR → agent hook (optional) → git pre-push → know-code check
 ## Install
 
 ```bash
-# CLI
+# CLI (npm, after publish) — or from git:
 npm i -g know-code
+# npm i -g github:chtnnh/know-code#main:packages/cli
 
 # In your repo
 know-code init --level standard --agents claude,cursor,codex
