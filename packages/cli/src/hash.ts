@@ -1,11 +1,5 @@
 import { createHash } from "node:crypto";
-import {
-  currentHead,
-  git,
-  logOneline,
-  mergeBase,
-  resolveBaseRef,
-} from "./git.js";
+import { currentHead, git, mergeBase, resolveBaseRef } from "./git.js";
 import type { Config, DiffContext } from "./types.js";
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -15,9 +9,10 @@ export function sha256(input: string): string {
 }
 
 /**
- * Hash the patch from merge-base (or empty tree) to the **index** (HEAD + staged).
- * That way a quiz before `git commit` stays valid after the commit lands, and
- * message-only amends do not change the hash.
+ * Hash is the patch from the empty tree to the **index** (HEAD + staged).
+ * A fixed floor (not merge-base) keeps the hash stable when origin/main
+ * catches up to HEAD and when quiz-then-commit lands the same tree.
+ * Message-only amends do not change the tree, so they keep the same hash.
  */
 export function computeDiffContext(
   repoRoot: string,
@@ -26,38 +21,28 @@ export function computeDiffContext(
   const baseRef = resolveBaseRef(repoRoot, config.baseBranch);
   const headRef = currentHead(repoRoot);
 
-  let from: string;
-  if (headRef === EMPTY_TREE) {
-    from = EMPTY_TREE;
-  } else {
-    from = mergeBase(repoRoot, baseRef, headRef);
-    const committed = git(["diff", `${from}...${headRef}`], repoRoot, {
+  // Display range only — not part of the hash material
+  let rangeFrom = EMPTY_TREE;
+  if (headRef !== EMPTY_TREE) {
+    const mb = mergeBase(repoRoot, baseRef, headRef);
+    const committed = git(["diff", `${mb}...${headRef}`], repoRoot, {
       allowFail: true,
     });
-    // On the base branch tip, triple-dot is empty — use empty-tree as the floor.
-    if (!committed.trim()) {
-      from = EMPTY_TREE;
-    }
+    rangeFrom = committed.trim() ? mb : EMPTY_TREE;
   }
 
-  // Index = HEAD tree + staged changes (what the next commit would contain)
   const indexTree =
     git(["write-tree"], repoRoot, { allowFail: true }) || EMPTY_TREE;
-  const diff = git(["diff", from, indexTree], repoRoot, { allowFail: true });
-  const log =
-    headRef === EMPTY_TREE
-      ? ""
-      : logOneline(repoRoot, from === EMPTY_TREE ? headRef : from, headRef);
+  const diff = git(["diff", EMPTY_TREE, indexTree], repoRoot, {
+    allowFail: true,
+  });
 
-  const commitRange = `${from}..${headRef === EMPTY_TREE ? "HEAD" : headRef}`;
-  const material = [`base:${baseRef}`, `from:${from}`, `diff:${diff}`].join(
-    "\n",
-  );
+  const material = [`diff:${diff}`].join("\n");
 
   return {
     baseRef,
     headRef: headRef === EMPTY_TREE ? EMPTY_TREE : headRef,
-    commitRange,
+    commitRange: `${rangeFrom}..${headRef === EMPTY_TREE ? "HEAD" : headRef}`,
     diff,
     diffHash: sha256(material),
   };

@@ -14,11 +14,11 @@ Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commi
 6. **CI** — verifies a `Know-Code-Verified: <hash>` commit trailer on pull requests.
 
 ```text
-commit/push/PR → hook deny → know-code-teach (unless skipped)
+teach (before edits) → implement → hook deny?
                 ↓
-          know-code skill → write quiz.json → know-code ask (browser)
+          know-code-teach (unless skipped) → quiz.json → know-code ask
                 ↓
-          grade answers → know-code pass → retry
+          grade → know-code pass → know-code commit -m "…" → push
 ```
 
 ## Install
@@ -63,6 +63,7 @@ know-code hash [--json]
 know-code check          # exit 0 allow / 2 block (commit + push)
 know-code pass --level standard --hash <diffHash>
 know-code ask [--quiz .know-code/quiz.json]   # browser answer form
+know-code commit -m "msg"   # commit + Know-Code-Verified trailer (use this, not git commit)
 know-code verify         # CI trailer check
 ```
 

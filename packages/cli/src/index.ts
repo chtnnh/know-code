@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { cmdAsk } from "./commands/ask.js";
 import { cmdCheck } from "./commands/check.js";
+import { cmdCommit } from "./commands/commit.js";
 import { cmdHash } from "./commands/hash.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdPass } from "./commands/pass.js";
@@ -15,6 +16,7 @@ Usage:
   know-code check
   know-code pass [--level lite|standard|deep] [--hash <diffHash>]
   know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--no-open]
+  know-code commit -m "<message>" [--no-trailer] [--] [git commit args...]
   know-code status [--json]
   know-code hash [--json]
   know-code verify [--require-all]
@@ -31,14 +33,22 @@ Docs: https://github.com/chtnnh/know-code
 function parseArgs(argv: string[]): {
   command: string;
   flags: Record<string, string | boolean>;
+  rest: string[];
 } {
-  const [command = "help", ...rest] = argv;
+  const [command = "help", ...rest0] = argv;
+  if (command === "commit") {
+    return { command, flags: {}, rest: rest0 };
+  }
   const flags: Record<string, string | boolean> = {};
-  for (let i = 0; i < rest.length; i++) {
-    const arg = rest[i];
-    if (!arg.startsWith("--")) continue;
+  const rest: string[] = [];
+  for (let i = 0; i < rest0.length; i++) {
+    const arg = rest0[i];
+    if (!arg.startsWith("--")) {
+      rest.push(arg);
+      continue;
+    }
     const key = arg.slice(2);
-    const next = rest[i + 1];
+    const next = rest0[i + 1];
     if (!next || next.startsWith("--")) {
       flags[key] = true;
     } else {
@@ -46,11 +56,11 @@ function parseArgs(argv: string[]): {
       i++;
     }
   }
-  return { command, flags };
+  return { command, flags, rest };
 }
 
 function main(): void {
-  const { command, flags } = parseArgs(process.argv.slice(2));
+  const { command, flags, rest } = parseArgs(process.argv.slice(2));
 
   try {
     switch (command) {
@@ -93,6 +103,9 @@ function main(): void {
           process.exit(1);
         });
         return;
+      case "commit":
+        cmdCommit(rest[0] === "--" ? rest.slice(1) : rest);
+        break;
       case "help":
       case "--help":
       case "-h":

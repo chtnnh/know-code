@@ -44,5 +44,8 @@ export function cmdPass(opts: {
   console.log(
     "know-code: optional commit trailer: Know-Code-Verified: " + ctx.diffHash,
   );
-  console.log("know-code: safe to retry git commit / git push / gh pr create");
+  console.log(
+    'know-code: commit with: know-code commit -m "<message>" (adds Know-Code-Verified trailer)',
+  );
+  console.log("know-code: then retry push / gh pr create as needed");
 }
