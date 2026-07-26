@@ -9,6 +9,15 @@
             "command": "KNOW_CODE_HOOK_FORMAT=claude bash hooks/check-shell.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "KNOW_CODE_HOOK_FORMAT=claude bash 'hooks/check-shell.sh'"
+          }
+        ]
       }
     ]
   }

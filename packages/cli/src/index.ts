@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { cmdAsk } from "./commands/ask.js";
 import { cmdCheck } from "./commands/check.js";
 import { cmdHash } from "./commands/hash.js";
 import { cmdInit } from "./commands/init.js";
@@ -6,13 +7,14 @@ import { cmdPass } from "./commands/pass.js";
 import { cmdStatus } from "./commands/status.js";
 import { cmdVerify } from "./commands/verify.js";
 
-const HELP = `know-code — block push/PR until you can explain the diff
+const HELP = `know-code — block commit/push/PR until you can explain the diff
 
 Usage:
   know-code init [--level lite|standard|deep] [--base-branch main]
                  [--agents claude,cursor,codex] [--require-trailer]
   know-code check
   know-code pass [--level lite|standard|deep] [--hash <diffHash>]
+  know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--no-open]
   know-code status [--json]
   know-code hash [--json]
   know-code verify [--require-all]
@@ -21,6 +23,7 @@ Usage:
 Environment:
   KNOW_CODE_LEVEL       Override quiz level
   KNOW_CODE_OVERRIDE=1  Bypass gate once (logged)
+  KNOW_CODE_QUIZ_PORT   Port for browser quiz UI (default 3847)
 
 Docs: https://github.com/chtnnh/know-code
 `;
@@ -80,6 +83,16 @@ function main(): void {
       case "verify":
         cmdVerify({ requireAll: flags["require-all"] === true });
         break;
+      case "ask":
+        void cmdAsk({
+          quiz: typeof flags.quiz === "string" ? flags.quiz : undefined,
+          port: typeof flags.port === "string" ? flags.port : undefined,
+          noOpen: flags["no-open"] === true,
+        }).catch((err) => {
+          console.error(`know-code: ${err instanceof Error ? err.message : err}`);
+          process.exit(1);
+        });
+        return;
       case "help":
       case "--help":
       case "-h":

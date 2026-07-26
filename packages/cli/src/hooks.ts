@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gitHooksDir } from "./paths.js";
 
-const PRE_PUSH_MARKER = "# know-code pre-push";
+const HOOK_MARKER = "# know-code gate";
 
 function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -27,14 +27,15 @@ export function bundledHooksDir(): string {
   return join(packageRoot(), "hooks");
 }
 
-export function prePushHookScript(): string {
+/** Shared body for git pre-commit and pre-push. */
+export function gitGateHookScript(): string {
   return `#!/usr/bin/env bash
-${PRE_PUSH_MARKER}
-# Blocks push unless know-code quiz receipt matches the current diff.
+${HOOK_MARKER}
+# Blocks commit/push unless know-code quiz receipt matches the current index diff.
 set -euo pipefail
 
 if [[ "\${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
-  echo "know-code: KNOW_CODE_OVERRIDE=1 — allowing push (logged)." >&2
+  echo "know-code: KNOW_CODE_OVERRIDE=1 — allowing (logged)." >&2
   ROOT="\$(git rev-parse --show-toplevel)"
   mkdir -p "\$ROOT/.know-code"
   echo "know-code: override at \$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "\$ROOT/.know-code/override.log"
@@ -45,7 +46,7 @@ if command -v know-code >/dev/null 2>&1; then
   exec know-code check
 fi
 
-ROOT="$(git rev-parse --show-toplevel)"
+ROOT="\$(git rev-parse --show-toplevel)"
 if [[ -x "\$ROOT/node_modules/.bin/know-code" ]]; then
   exec "\$ROOT/node_modules/.bin/know-code" check
 fi
@@ -63,19 +64,18 @@ exit 1
 `;
 }
 
-export function installGitPrePush(repoRoot: string): {
-  path: string;
-  created: boolean;
-  backedUp?: string;
-} {
+function installGitHook(
+  repoRoot: string,
+  name: "pre-commit" | "pre-push",
+): { path: string; created: boolean; backedUp?: string } {
   const hooksDir = gitHooksDir(repoRoot);
   mkdirSync(hooksDir, { recursive: true });
-  const hookPath = join(hooksDir, "pre-push");
-  const script = prePushHookScript();
+  const hookPath = join(hooksDir, name);
+  const script = gitGateHookScript();
 
   if (existsSync(hookPath)) {
     const existing = readFileSync(hookPath, "utf8");
-    if (existing.includes(PRE_PUSH_MARKER)) {
+    if (existing.includes(HOOK_MARKER) || existing.includes("# know-code pre-push")) {
       writeFileSync(hookPath, script);
       chmodSync(hookPath, 0o755);
       return { path: hookPath, created: false };
@@ -92,10 +92,20 @@ export function installGitPrePush(repoRoot: string): {
   return { path: hookPath, created: true };
 }
 
+export function installGitPrePush(repoRoot: string) {
+  return installGitHook(repoRoot, "pre-push");
+}
+
+export function installGitPreCommit(repoRoot: string) {
+  return installGitHook(repoRoot, "pre-commit");
+}
+
 export type AgentId = "claude" | "cursor" | "codex";
 
+const CURSOR_MATCHER =
+  "git commit|git push|gh pr create|glab mr create";
+
 function installCheckScript(repoRoot: string): string {
-  // Prefer a committed repo-root hooks/ script when present (dogfooding / vendored)
   const committed = join(repoRoot, "hooks", "check-shell.sh");
   if (existsSync(committed)) {
     chmodSync(committed, 0o755);
@@ -111,7 +121,6 @@ function installCheckScript(repoRoot: string): string {
   }
   copyFileSync(src, dest);
   chmodSync(dest, 0o755);
-  // Relative path so generated agent configs are portable across machines
   return ".know-code/check-shell.sh";
 }
 
@@ -190,7 +199,7 @@ function mergeCursorHooks(destPath: string, scriptPath: string): void {
   );
   filtered.push({
     command: hookCommand("cursor", scriptPath),
-    matcher: "git push|gh pr create|glab mr create",
+    matcher: CURSOR_MATCHER,
   });
   writeJson(destPath, {
     version: existing.version ?? 1,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared gate for agent shell hooks. Reads JSON on stdin (Claude/Cursor/Codex).
-# Denies git push / gh pr create / glab mr create when know-code check fails.
+# Denies git commit / push / PR creation when know-code check fails.
 set -euo pipefail
 
 INPUT="$(cat || true)"
@@ -19,6 +19,7 @@ CMD="$(
 
 should_gate() {
   local c="$1"
+  [[ "$c" =~ git[[:space:]]+commit ]] && return 0
   [[ "$c" =~ git[[:space:]]+push ]] && return 0
   [[ "$c" =~ gh[[:space:]]+pr[[:space:]]+create ]] && return 0
   [[ "$c" =~ glab[[:space:]]+mr[[:space:]]+create ]] && return 0
@@ -57,7 +58,6 @@ run_check() {
     "node_modules/.bin/know-code" check
     return $?
   fi
-  # Monorepo / linked checkout
   if [[ -f "packages/cli/dist/index.js" ]]; then
     node "packages/cli/dist/index.js" check
     return $?
@@ -81,7 +81,7 @@ if [[ "${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
   exit 0
 fi
 
-REASON="know-code: blocked. Run the know-code skill (/know-code), pass the quiz, then retry. Bypass: KNOW_CODE_OVERRIDE=1"
+REASON="know-code: blocked. Run know-code-teach first (unless skipped), then /know-code browser quiz, then retry. Bypass: KNOW_CODE_OVERRIDE=1"
 
 if run_check; then
   allow_json

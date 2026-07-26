@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { readConfig, writeConfig } from "../config.js";
 import {
   installAgentHooks,
+  installGitPreCommit,
   installGitPrePush,
   type AgentId,
 } from "../hooks.js";
@@ -39,18 +40,19 @@ export function cmdInit(opts: {
   }
 
   writeConfig(repoRoot, config);
-
-  // Ensure .know-code is gitignored
   ensureGitignore(repoRoot);
 
-  const hook = installGitPrePush(repoRoot);
-  console.log(
-    hook.created
-      ? `Installed git pre-push hook → ${hook.path}`
-      : `Updated git pre-push hook → ${hook.path}`,
-  );
-  if (hook.backedUp) {
-    console.log(`Backed up previous hook → ${hook.backedUp}`);
+  for (const install of [installGitPreCommit, installGitPrePush]) {
+    const hook = install(repoRoot);
+    const label = hook.path.endsWith("pre-commit") ? "pre-commit" : "pre-push";
+    console.log(
+      hook.created
+        ? `Installed git ${label} hook → ${hook.path}`
+        : `Updated git ${label} hook → ${hook.path}`,
+    );
+    if (hook.backedUp) {
+      console.log(`Backed up previous hook → ${hook.backedUp}`);
+    }
   }
 
   if (opts.agents) {
@@ -83,13 +85,24 @@ export function cmdInit(opts: {
 
 function ensureGitignore(repoRoot: string): void {
   const gi = join(repoRoot, ".gitignore");
-  const line = ".know-code/";
+  const block = [
+    "# Local gate state — keep shared config committed",
+    ".know-code/*",
+    "!.know-code/config.json",
+  ].join("\n");
+
   if (!existsSync(gi)) {
-    writeFileSync(gi, `${line}\n`);
+    writeFileSync(gi, `${block}\n`);
     return;
   }
   const content = readFileSync(gi, "utf8");
-  if (!content.split("\n").some((l) => l.trim() === line || l.trim() === ".know-code")) {
-    writeFileSync(gi, content.endsWith("\n") ? `${content}${line}\n` : `${content}\n${line}\n`);
+  if (content.includes(".know-code/gate.json") || content.includes("!.know-code/config.json")) {
+    return;
+  }
+  if (!content.includes(".know-code")) {
+    writeFileSync(
+      gi,
+      content.endsWith("\n") ? `${content}${block}\n` : `${content}\n${block}\n`,
+    );
   }
 }

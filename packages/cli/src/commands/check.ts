@@ -29,15 +29,15 @@ export function cmdCheck(): never {
       ? "diff changed since last quiz"
       : `receipt level "${receipt.level}" is below required "${config.level}"`;
 
-  console.error(`know-code: push blocked — ${reason}.`);
+  console.error(`know-code: commit/push blocked — ${reason}.`);
   console.error(
     `know-code: current hash ${ctx.diffHash} (level: ${config.level}).`,
   );
   console.error(
-    "know-code: run the know-code skill (or `/know-code`) and pass the quiz, then retry.",
+    "know-code: run know-code-teach (unless skipped), then the know-code skill / browser quiz, then retry.",
   );
   console.error(
-    "know-code: emergency bypass: KNOW_CODE_OVERRIDE=1 git push",
+    "know-code: emergency bypass: KNOW_CODE_OVERRIDE=1 git commit|push",
   );
   process.exit(2);
 }

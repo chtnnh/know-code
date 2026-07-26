@@ -41,9 +41,11 @@ While coding, keep explanations **incremental**: after meaningful chunks, narrat
 | Skill | Role |
 |-------|------|
 | `know-code-teach` | Build understanding during work |
-| `know-code` | Verify understanding before push/PR |
+| `know-code` | Verify understanding before commit/push/PR |
 
-Ideal loop: teach → implement → teach deltas → `know-code` quiz → push.
+**Required order after a gate deny:** run this skill first, then `know-code`, unless the human explicitly skips teaching.
+
+Ideal loop: teach → implement → teach deltas → `know-code` quiz → commit/push.
 
 ## Hard rules
 

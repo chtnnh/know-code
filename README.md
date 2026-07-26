@@ -2,22 +2,23 @@
 
 **Your agents don’t push until you know exactly what’s changed.**
 
-Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git push` / PR creation until the **human** passes a comprehension quiz about the diff. Three difficulty levels. Works with Claude Code, Cursor, Codex, Zed, and plain terminals.
+Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commit`, `git push`, and PR creation until the **human** passes a comprehension quiz about the diff. Three difficulty levels. Works with Claude Code, Cursor, Codex, Zed, and plain terminals.
 
 ## How it works
 
-1. **Skill** — the host agent diffs your branch, asks level-appropriate questions in chat, and grades your answers (no extra API key).
-2. **CLI receipt** — on pass, `know-code pass` writes `.know-code/gate.json` keyed to a content hash of the diff.
-3. **Git pre-push** — `know-code check` must succeed or the push fails (Zed / terminal / any agent).
-4. **Agent hooks** — Claude / Cursor / Codex deny `git push` / `gh pr create` early and tell the agent to run this skill.
-5. **CI** — GitHub Action verifies a `Know-Code-Verified: <hash>` commit trailer on pull requests.
+1. **Skill** — the host agent diffs your index (HEAD + staged) and writes level-appropriate questions.
+2. **Browser quiz** — `know-code ask` opens a local form with a **dedicated textarea per answer** (not the agent chat). The agent grades the submitted answers.
+3. **CLI receipt** — on pass, `know-code pass` writes `.know-code/gate.json` keyed to a content hash of the patch.
+4. **Git hooks** — `pre-commit` and `pre-push` run `know-code check`.
+5. **Agent hooks** — Claude / Cursor / Codex deny `git commit` / `git push` / `gh pr create` and redirect to the skill.
+6. **CI** — verifies a `Know-Code-Verified: <hash>` commit trailer on pull requests.
 
 ```text
-push/PR → agent hook → git pre-push → know-code check
-                ↓ fail
-          know-code skill (quiz) → know-code pass → retry
+commit/push/PR → hook deny → know-code-teach (unless skipped)
                 ↓
-          commit trailer → CI verify
+          know-code skill → write quiz.json → know-code ask (browser)
+                ↓
+          grade answers → know-code pass → retry
 ```
 
 ## Install
@@ -59,14 +60,16 @@ export KNOW_CODE_LEVEL=lite
 know-code init [--level …] [--base-branch main] [--agents claude,cursor,codex]
 know-code status [--json]
 know-code hash [--json]
-know-code check          # exit 0 allow / 2 block
+know-code check          # exit 0 allow / 2 block (commit + push)
 know-code pass --level standard --hash <diffHash>
+know-code ask [--quiz .know-code/quiz.json]   # browser answer form
 know-code verify         # CI trailer check
 ```
 
 Emergency bypass (logged):
 
 ```bash
+KNOW_CODE_OVERRIDE=1 git commit
 KNOW_CODE_OVERRIDE=1 git push
 ```
 

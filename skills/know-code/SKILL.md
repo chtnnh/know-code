@@ -1,27 +1,29 @@
 ---
 name: know-code
 description: >-
-  Gate git push and PR creation until the human passes a comprehension quiz
-  about the current code changes. Use when push/PR is blocked by know-code,
-  when the user asks to run know-code or verify they understand the diff, or
-  before git push / gh pr create / glab mr create. Quizzes at lite, standard,
-  or deep difficulty; writes a gate receipt via the know-code CLI.
-compatibility: "requires git, node>=20, know-code CLI (npm i -g know-code)"
+  Gate git commit, git push, and PR creation until the human passes a
+  comprehension quiz about the current code changes. Use when commit/push/PR is
+  blocked by know-code, when the user asks to run know-code or verify they
+  understand the diff, or before git commit / git push / gh pr create / glab mr
+  create. Always run know-code-teach first unless the human explicitly skips
+  teaching. Quizzes via a browser form with dedicated answer fields; writes a
+  gate receipt via the know-code CLI.
+compatibility: "requires git, node>=20, know-code CLI; browser preferred for quiz UI"
 metadata:
   author: chtnnh
-  version: "0.1.0"
+  version: "0.1.2"
 license: MIT
 ---
 
 # know-code
 
-Block shipping until the **human** can explain the diff. You (the agent) generate and grade questions; the CLI is the only authority that opens the gate.
+Block committing and shipping until the **human** can explain the diff. You generate questions; the human answers in a **browser form** (dedicated textboxes); you grade; the CLI opens the gate.
 
 ## When to run
 
-- A hook or `git push` failed with `know-code: push blocked`
+- A hook failed with `know-code: commit/push blocked`
 - User asks to verify understanding / run know-code / open the gate
-- Immediately before `git push`, `gh pr create`, or `glab mr create` if status is not allowed
+- Immediately before `git commit`, `git push`, `gh pr create`, or `glab mr create` if status is not allowed
 
 ## Prerequisites
 
@@ -30,11 +32,18 @@ command -v know-code || npx --yes know-code --help
 know-code status --json
 ```
 
-If the CLI is missing: `npm i -g know-code` (or use `npx know-code …`).
-
 ## Workflow
 
 Follow every step. Do **not** skip the quiz or invent a pass.
+
+### 0. Teach first (required)
+
+**Before** writing `quiz.json` or running `know-code ask`, run **know-code-teach** on the current staged/index diff (intent, touch map, approach, trade-offs, risks).
+
+Skip teaching only if the human explicitly says so (e.g. “skip teach”, “I already know this”, “ready to quiz” after a teach session in the same turn).  
+If the human says they don’t know the repo / want a catch-up, you **must** teach before quizzing — even if they also said they want the quiz.
+
+Do not open the gate during teaching.
 
 ### 1. Read level and hash
 
@@ -43,87 +52,78 @@ know-code status --json
 know-code hash --json
 ```
 
-- Level comes from `.know-code/config.json` or `KNOW_CODE_LEVEL` (`lite` | `standard` | `deep`). Default: `standard`.
-- If the human asks to change level for this quiz, respect that and pass `--level` to `know-code pass` later.
-- Record `diffHash` from the hash command. All questions must be about **this** diff only.
+- Level: `.know-code/config.json` or `KNOW_CODE_LEVEL` (`lite` | `standard` | `deep`).
+- Record `diffHash`. Stage intended changes before quizzing (hash covers the **index**).
 
 ### 2. Collect the diff
 
-```bash
-know-code status --json
-```
-
-From the JSON, take `commitRange` (`from..head`). Then:
-
-```bash
-git diff <from>...<head>
-git log --oneline <from>..<head>
-```
-
-If `diffStat` is empty, fall back to `git show --stat HEAD` and `git show HEAD`.
+Use status/`git diff <from> $(git write-tree)` / `git diff --cached` so questions are grounded in the real patch.
 
 ### 3. Load the rubric
 
-Read `references/levels.md` for the active level (question count, focus, pass bar).  
-Optionally skim `references/question-templates.md` for prompt ideas.
+Read `references/levels.md` (and optionally `references/question-templates.md`).
 
-### 4. Generate questions
+### 4. Write the quiz file
 
-Rules:
+Create `.know-code/quiz.json` (do **not** ask questions in the agent chat):
 
-- Ground every question in the actual diff (cite paths).
-- No trivia about unrelated code.
-- Do **not** reveal answers or lead the human.
-- Match count and depth to the level rubric.
-- Prefer free-response over multiple choice.
+```json
+{
+  "diffHash": "<from know-code hash>",
+  "level": "standard",
+  "title": "know-code quiz",
+  "questions": [
+    { "id": "q1", "prompt": "…" },
+    { "id": "q2", "prompt": "…" }
+  ]
+}
+```
 
-### 5. Quiz the human
+Rules for prompts: grounded in the diff, cite paths, no leading, free-response, count/depth per level.
 
-- Ask **one question at a time**.
-- Grade each answer honestly against the diff (≥80% of questions must be solidly correct).
-- On a weak answer: give **one** hint, allow **one** retry for that question, then mark it failed if still wrong.
-- Do not write the gate receipt until the pass bar is met.
+### 5. Open the browser quiz UI (required when a browser exists)
 
-### 6. Open the gate
+```bash
+know-code ask --quiz .know-code/quiz.json
+```
+
+This opens a local page with **one textarea per question**. Tell the human:
+
+> Answer in the browser form that just opened — not in this chat.
+
+Wait for the command to finish. It writes `.know-code/answers.json` and prints JSON.
+
+**Fallback (headless / no browser only):** if `know-code ask` cannot open a UI, say so once and collect answers in chat. Never use chat answers when the browser UI is available.
+
+### 6. Grade
+
+Read `.know-code/answers.json`. Grade honestly against the diff (≥80% solidly correct).  
+Weak answers: you may rewrite only those prompts in `quiz.json` and re-run `know-code ask` once for retries — or fail the quiz. After a fail, offer **know-code-teach** on the weak spots before re-quizzing.
+
+### 7. Open the gate
 
 Only after a real pass:
 
 ```bash
 know-code pass --level <lite|standard|deep> --hash <diffHash>
+know-code check
 ```
 
-- `--hash` must equal the hash from step 1. If the working tree changed during the quiz, re-hash and re-quiz — do not force a pass.
-- Confirm with `know-code check` (exit 0).
+### 8. Resume ship
 
-### 7. Resume ship
-
-Tell the human/agent it is safe to retry `git push` / `gh pr create`.
-
-If `.know-code/config.json` has `"requireTrailer": true` (this repo does), help the human add a commit trailer before opening/updating the PR:
-
-```text
-Know-Code-Verified: <diffHash>
-```
-
-Example:
-
-```bash
-HASH=$(know-code hash)
-git commit --amend -m "$(git log -1 --format=%B | sed -e '/^Know-Code-Verified:/d')
-
-Know-Code-Verified: ${HASH}"
-```
-
-CI runs `know-code verify` on pull requests and will fail without a matching trailer.
+Safe to retry `git commit` / `git push` / `gh pr create`.  
+If `requireTrailer` is true, include `Know-Code-Verified: <diffHash>` on the commit.
 
 ## Hard rules
 
-- Never call `know-code pass` because the human is in a hurry or the agent “already knows.”
+- **Teach before quiz** unless the human explicitly skips teaching.
+- **Do not quiz in the agent prompt box** when `know-code ask` can run.
+- Never call `know-code pass` without a real graded pass.
 - Never paste model-written answers for the human.
-- Emergency bypass is human-only: `KNOW_CODE_OVERRIDE=1 git push` (logged). Do not suggest it unless they explicitly ask for a bypass.
-- Teaching belongs in `know-code-teach`. This skill only verifies.
+- Bypass is human-only: `KNOW_CODE_OVERRIDE=1`.
+- Teaching belongs in `know-code-teach` (this skill only verifies).
 
-## Install (for humans)
+## Install
 
 ```bash
 npm i -g know-code
@@ -131,4 +131,4 @@ know-code init --level standard --agents claude,cursor,codex
 npx skills add chtnnh/know-code
 ```
 
-Zed and plain terminals rely on the git `pre-push` hook from `know-code init` (no agent shell hooks).
+Zed/terminal: git `pre-commit` / `pre-push` still enforce; quiz UI still opens in the system browser when the skill runs `know-code ask`.

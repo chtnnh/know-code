@@ -34,7 +34,7 @@ export function cmdStatus(json = false): void {
   }
 
   console.log(`know-code status`);
-  console.log(`  push allowed: ${allowed ? "yes" : "no"}`);
+  console.log(`  commit/push allowed: ${allowed ? "yes" : "no"}`);
   console.log(`  level:        ${config.level}`);
   console.log(`  hash:         ${ctx.diffHash}`);
   console.log(`  range:        ${ctx.commitRange}`);
