@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc",
     "test": "node --test dist/hash.test.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "node ../../scripts/sync-hooks.mjs && npm run build"
   },
   "engines": {
     "node": ">=20"

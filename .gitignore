@@ -11,3 +11,11 @@ coverage/
 # Local gate state — keep shared config committed
 .know-code/*
 !.know-code/config.json
+
+# Generated from hooks/ + LICENSE at repo root (see scripts/sync-hooks.mjs)
+packages/cli/hooks/
+packages/cli/LICENSE
+
+# Local harness skill links (committed: .agents/skills only)
+.cursor/skills/
+.claude/skills/

@@ -1,21 +1,23 @@
 # know-code
 
-This repository dogfoods its own gate. Skills are linked under:
+This repository dogfoods its own gate.
 
-- `.agents/skills/know-code` + `know-code-teach`
-- `.cursor/skills/…`
-- `.claude/skills/…`
+- Skill source: `skills/know-code`, `skills/know-code-teach`
+- Committed links: `.agents/skills/`
+- Local Cursor/Claude links: created by `npm run link-skills` (gitignored)
+- Agent hooks: `.cursor/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`
+- Config: `.know-code/config.json` (`requireTrailer: true`)
 
 ## Skills
 
-- **know-code** — quiz the human before push/PR; write a gate receipt with the CLI; add `Know-Code-Verified` trailer for CI
-- **know-code-teach** — explain architecture and trade-offs while coding (does not open the gate)
+- **know-code** — quiz before push/PR; `know-code pass`; add `Know-Code-Verified` trailer for CI
+- **know-code-teach** — explain while coding (does not open the gate)
 
 ## When push/PR is blocked
 
 1. Run the **know-code** skill
-2. Pass the quiz → `know-code pass --level <level> --hash <diffHash>`
-3. Amend or add a commit with trailer `Know-Code-Verified: <diffHash>`
+2. `know-code pass --level <level> --hash <diffHash>`
+3. Add trailer `Know-Code-Verified: <diffHash>` on the commit
 4. Retry push / open PR
 
-CLI (from this checkout): `node packages/cli/dist/index.js …` or `npm i -g github:chtnnh/know-code#main:packages/cli`.
+CLI from this checkout: `npm run know-code -- …`

@@ -33,16 +33,7 @@ know-code init --level standard --agents claude,cursor,codex
 npx skills add chtnnh/know-code
 ```
 
-Or copy/symlink from a checkout of this repo:
-
-```bash
-mkdir -p .agents/skills .cursor/skills .claude/skills
-ln -s /path/to/know-code/skills/know-code .agents/skills/know-code
-ln -s /path/to/know-code/skills/know-code-teach .agents/skills/know-code-teach
-# repeat under .cursor/skills and .claude/skills as needed
-```
-
-This repository already has the skills linked under `.agents/skills`, `.cursor/skills`, and `.claude/skills`, plus agent hooks and a required PR check.
+This repository keeps skills under `skills/` and links them into `.agents/skills/` (committed). After `npm install`, `prepare` also links Cursor/Claude skill dirs locally and syncs hooks into the CLI package for publish.
 
 ### Zed
 
@@ -126,20 +117,21 @@ Mark **know-code / verify** as a required status check in branch protection.
 ## Repo layout
 
 ```text
-skills/know-code/           # gate + quiz skill
-skills/know-code-teach/     # explain-while-coding skill
-packages/cli/               # npm package "know-code"
-hooks/                      # agent hook fragments + check-shell.sh
-action/                     # GitHub Action
+skills/                     # skill source (know-code, know-code-teach)
+.agents/skills/             # committed symlinks → skills/
+hooks/                      # check-shell.sh + agent hook fragments (single copy)
+packages/cli/               # TypeScript CLI (hooks/ synced on prepare/publish)
+action/                     # composite GitHub Action
+scripts/                    # link-skills.mjs, sync-hooks.mjs
 ```
 
 ## Development
 
 ```bash
-npm install
+npm install   # links skills + syncs hooks into packages/cli
 npm run build
 npm test
-node packages/cli/dist/index.js status
+npm run know-code -- status
 ```
 
 ## Prior art
