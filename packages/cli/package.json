@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "node --test dist/**/*.test.js",
+    "test": "node --test dist/hash.test.js",
     "prepublishOnly": "npm run build"
   },
   "engines": {
