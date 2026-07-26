@@ -61,7 +61,7 @@ if command -v npx >/dev/null 2>&1; then
   exec npx --yes know-code check
 fi
 
-echo "know-code: CLI not found. Install with: npm i -g know-code" >&2
+echo "know-code: CLI not found. Install with: npm i -g @chtnnh/know-code" >&2
 echo "know-code: or set KNOW_CODE_OVERRIDE=1 to bypass once." >&2
 exit 1
 `;

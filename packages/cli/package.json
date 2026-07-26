@@ -1,5 +1,5 @@
 {
-  "name": "know-code",
+  "name": "@chtnnh/know-code",
   "version": "0.1.2",
   "description": "Gate git push / PR creation until the human passes a comprehension quiz about the diff",
   "type": "module",
@@ -18,6 +18,9 @@
     "build": "tsc",
     "test": "node --test dist/**/*.test.js",
     "prepublishOnly": "node ../../scripts/sync-hooks.mjs && npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=20"

@@ -2,6 +2,9 @@
 
 ## 0.1.2
 
+### Package
+- Published as **`@chtnnh/know-code`** (unscoped `know-code` is blocked by npm as too similar to `knowcode`). Binary remains `know-code`.
+
 ### CLI
 - `know-code commit` remains the supported path for `Know-Code-Verified` trailers
 - `know-code init --workflow` writes a consumer GitHub Actions workflow using `chtnnh/know-code/action@v0.1.2`

@@ -21,10 +21,10 @@ teach → implement → quiz (browser) → know-code pass → know-code commit �
 ## Install
 
 ```bash
-# CLI (preferred after publish)
-npm i -g know-code
+# CLI (scoped — unscoped know-code is taken / blocked by npm)
+npm i -g @chtnnh/know-code
 
-# Fallback before / without npm
+# Fallback from GitHub
 npm i -g github:chtnnh/know-code#main:packages/cli
 
 know-code init --level standard --agents claude,cursor,codex --workflow
@@ -92,8 +92,8 @@ npm run build -w website   # docs site
 
 1. Public GitHub repo  
 2. Pages: source = GitHub Actions; DNS `kc` CNAME → `chtnnh.github.io`  
-3. Set `NPM_TOKEN` secret; tag `v0.1.2` to run [`.github/workflows/release.yml`](.github/workflows/release.yml)  
-4. Smoke install from npm + Action on a fresh repo  
+3. Publish: `npm publish -w @chtnnh/know-code --access public --otp=…` (or tag `v0.1.2` if `NPM_TOKEN` is set)  
+4. Smoke: `npm i -g @chtnnh/know-code` then `know-code --version`  
 
 See [CHANGELOG.md](./CHANGELOG.md).
 

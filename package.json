@@ -9,9 +9,9 @@
   ],
   "scripts": {
     "prepare": "node scripts/link-skills.mjs && node scripts/sync-hooks.mjs",
-    "build": "npm run build -w know-code",
+    "build": "npm run build -w @chtnnh/know-code",
     "build:docs": "npm run build -w website",
-    "test": "npm run test -w know-code",
+    "test": "npm run test -w @chtnnh/know-code",
     "link-skills": "node scripts/link-skills.mjs",
     "sync-hooks": "node scripts/sync-hooks.mjs",
     "know-code": "node packages/cli/dist/index.js"

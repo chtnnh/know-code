@@ -5,7 +5,11 @@ title: CLI reference
 
 # CLI reference
 
-Requires Node 20+.
+Requires Node 20+. Install the scoped package (binary is still `know-code`):
+
+```bash
+npm i -g @chtnnh/know-code
+```
 
 | Command | Purpose |
 |---------|---------|

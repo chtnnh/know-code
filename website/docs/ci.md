@@ -40,7 +40,7 @@ jobs:
 |-------|---------|-------------|
 | `base-branch` | `main` | Must match local `.know-code/config.json` |
 | `require-all` | `false` | Stricter messaging when trailers missing |
-| `version` | `^0.1.2` | npm pin when not building from this monorepo |
+| `version` | `^0.1.2` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
 
 ## What verify checks
 

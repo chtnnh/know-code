@@ -86,7 +86,7 @@ const config: Config = {
             },
             {
               label: "npm",
-              href: "https://www.npmjs.com/package/know-code",
+              href: "https://www.npmjs.com/package/@chtnnh/know-code",
             },
           ],
         },

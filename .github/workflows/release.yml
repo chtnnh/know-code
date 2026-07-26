@@ -26,7 +26,7 @@ jobs:
       - run: npm test
 
       - name: Publish CLI to npm
-        run: npm publish -w know-code --access public
+        run: npm publish -w @chtnnh/know-code --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

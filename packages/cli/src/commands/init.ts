@@ -121,7 +121,7 @@ export function cmdInit(opts: {
   console.log(`Config written → .know-code/config.json (level: ${config.level})`);
   console.log("");
   console.log("Next steps:");
-  console.log("  1. npm i -g know-code   # or: npm i -g github:chtnnh/know-code#main:packages/cli");
+  console.log("  1. npm i -g @chtnnh/know-code   # or: npm i -g github:chtnnh/know-code#main:packages/cli");
   console.log("  2. npx skills add chtnnh/know-code");
   console.log("  3. teach → implement → know-code ask (browser quiz) → know-code pass");
   console.log('  4. know-code commit -m "…"   # adds Know-Code-Verified trailer');

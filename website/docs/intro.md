@@ -13,10 +13,10 @@ know-code is a cross-harness [Agent Skill](https://agentskills.io) plus CLI that
 ## Install
 
 ```bash
-# CLI (after npm publish)
-npm i -g know-code
+# CLI (scoped package; bin is still `know-code`)
+npm i -g @chtnnh/know-code
 
-# Until publish, install from GitHub
+# Or from GitHub
 npm i -g github:chtnnh/know-code#main:packages/cli
 
 # In your repository

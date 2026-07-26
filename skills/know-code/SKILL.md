@@ -109,7 +109,7 @@ Then push when asked / when shipping.
 ## Install
 
 ```bash
-npm i -g know-code
+npm i -g @chtnnh/know-code
 know-code init --level standard --agents claude,cursor,codex --workflow
 npx skills add chtnnh/know-code
 ```

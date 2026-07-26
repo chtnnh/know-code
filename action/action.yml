@@ -44,7 +44,7 @@ runs:
           npm run build --prefix "$ROOT/packages/cli"
           npm install -g "$ROOT/packages/cli"
         else
-          npm install -g "know-code@${{ inputs.version }}"
+          npm install -g "@chtnnh/know-code@${{ inputs.version }}"
         fi
 
     - name: Ensure config
