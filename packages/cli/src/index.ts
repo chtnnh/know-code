@@ -5,6 +5,7 @@ import { cmdCommit } from "./commands/commit.js";
 import { cmdHash } from "./commands/hash.js";
 import { cmdInit } from "./commands/init.js";
 import { cmdPass } from "./commands/pass.js";
+import { cmdSkills } from "./commands/skills.js";
 import { cmdStatus } from "./commands/status.js";
 import { cmdVerify } from "./commands/verify.js";
 
@@ -13,6 +14,7 @@ const HELP = `know-code — block commit/push/PR until you can explain the diff
 Usage:
   know-code init [--level lite|standard|deep] [--base-branch main]
                  [--agents claude,cursor,codex] [--require-trailer] [--workflow]
+  know-code skills [--global|-g] [--agents <names>] [--yes]
   know-code check
   know-code pass [--level lite|standard|deep] [--hash <diffHash>]
   know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--timeout 1800] [--no-open]
@@ -109,6 +111,17 @@ function main(): void {
       case "commit":
         cmdCommit(rest[0] === "--" ? rest.slice(1) : rest);
         break;
+      case "skills":
+        cmdSkills({
+          global:
+            flags.global === true ||
+            flags.g === true ||
+            rest.includes("-g") ||
+            rest.includes("--global"),
+          agents: typeof flags.agents === "string" ? flags.agents : undefined,
+          yes: flags.yes === true || flags.y === true || rest.includes("-y"),
+        });
+        break;
       case "help":
       case "--help":
       case "-h":
@@ -117,7 +130,7 @@ function main(): void {
       case "version":
       case "--version":
       case "-v":
-        console.log("0.1.2");
+        console.log("0.1.3");
         break;
       default:
         console.error(`Unknown command: ${command}\n`);

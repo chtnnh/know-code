@@ -28,7 +28,11 @@ npm i -g @chtnnh/know-code
 npm i -g github:chtnnh/know-code#main:packages/cli
 
 know-code init --level standard --agents claude,cursor,codex --workflow
-npx skills add chtnnh/know-code
+
+# Skills — project only, or global (all repos)
+know-code skills
+know-code skills --global
+# equivalent: npx skills add chtnnh/know-code [--global]
 ```
 
 `init --workflow` adds a GitHub Actions workflow that uses [`chtnnh/know-code/action@v0.1.2`](./action).
@@ -49,6 +53,7 @@ Zed has no PreToolUse-style shell hooks. Rely on git hooks from `know-code init`
 
 ```bash
 know-code init [--level …] [--base-branch main] [--agents …] [--workflow]
+know-code skills [--global] [--agents cursor,claude-code,…]
 know-code status [--json]
 know-code hash [--json]
 know-code check

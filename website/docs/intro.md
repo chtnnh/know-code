@@ -22,8 +22,9 @@ npm i -g github:chtnnh/know-code#main:packages/cli
 # In your repository
 know-code init --level standard --agents claude,cursor,codex --workflow
 
-# Skills (Claude Code, Cursor, Codex, Zed, …)
-npx skills add chtnnh/know-code
+# Skills — this project, or every repo (--global)
+know-code skills
+know-code skills --global
 ```
 
 `init --workflow` writes `.github/workflows/know-code.yml` that runs the [composite GitHub Action](/ci) on pull requests and pushes to `main`.

@@ -111,7 +111,8 @@ Then push when asked / when shipping.
 ```bash
 npm i -g @chtnnh/know-code
 know-code init --level standard --agents claude,cursor,codex --workflow
-npx skills add chtnnh/know-code
+know-code skills              # project
+know-code skills --global     # all repos
 ```
 
 Docs: https://kc.chtnnhfoundation.org

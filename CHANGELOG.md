@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3
+
+### Package
+- Add `packages/cli/README.md` so the npm package page has documentation
+- `know-code skills [--global]` wraps `npx skills add chtnnh/know-code` for project or user-global skill install
+
+### Docs
+- Document global skill install (`--global` / harness home dirs)
+
 ## 0.1.2
 
 ### Package

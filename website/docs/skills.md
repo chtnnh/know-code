@@ -30,8 +30,20 @@ Hard rule: do not quiz in the agent chat when the browser form is available.
 
 ## Install into your harness
 
+**Project** (committed with the repo / shared with the team):
+
 ```bash
-npx skills add chtnnh/know-code
+know-code skills
+# or: npx skills add chtnnh/know-code
 ```
 
-Or symlink `skills/know-code` and `skills/know-code-teach` into `.agents/skills/` (this repo keeps committed links).
+**Global** (your user profile — available in every repo for Cursor, Claude Code, Codex, …):
+
+```bash
+know-code skills --global
+# or: npx skills add chtnnh/know-code --global
+```
+
+Global installs land under harness home dirs such as `~/.cursor/skills/`, `~/.claude/skills/`, and `~/.codex/skills/`. List with `npx skills ls -g`.
+
+You can still symlink `skills/know-code` and `skills/know-code-teach` into `.agents/skills/` manually (this repo keeps committed links).

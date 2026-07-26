@@ -1,7 +1,7 @@
 {
   "name": "know-code-monorepo",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "k(no)w-code — agents don't push until you know exactly what's changed",
   "workspaces": [
     "packages/cli",

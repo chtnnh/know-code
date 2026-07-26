@@ -14,6 +14,7 @@ npm i -g @chtnnh/know-code
 | Command | Purpose |
 |---------|---------|
 | `know-code init` | Config, git hooks; optional `--agents`, `--workflow` |
+| `know-code skills [--global]` | Install Agent Skills (project or user-global) |
 | `know-code status [--json]` | Gate status, hash, range |
 | `know-code hash [--json]` | Print current index hash |
 | `know-code check` | Exit 0 allow / 2 block |
