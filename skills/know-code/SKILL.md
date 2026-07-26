@@ -50,12 +50,17 @@ know-code hash --json
 ### 2. Collect the diff
 
 ```bash
-# Prefer the range from status JSON (commitRange / baseRef / headRef)
-git diff "$(know-code status --json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);const [a,b]=j.commitRange.split('..');console.log(a+'...'+b)})")"
-git log --oneline "$(know-code status --json | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).commitRange))")"
+know-code status --json
 ```
 
-Simpler approach: parse `status --json`, then run `git diff <baseRef>...HEAD` and `git log --oneline <merge-base>..HEAD`.
+From the JSON, take `commitRange` (`from..head`). Then:
+
+```bash
+git diff <from>...<head>
+git log --oneline <from>..<head>
+```
+
+If `diffStat` is empty, fall back to `git show --stat HEAD` and `git show HEAD`.
 
 ### 3. Load the rubric
 
