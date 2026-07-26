@@ -154,7 +154,7 @@ function mergeClaudeSettings(destPath: string, scriptPath: string): void {
     hooks: [
       {
         type: "command",
-        command: `KNOW_CODE_HOOK_FORMAT=claude ${shellQuote(scriptPath)}`,
+        command: hookCommand("claude", scriptPath),
       },
     ],
   });
@@ -174,7 +174,7 @@ function mergeCursorHooks(destPath: string, scriptPath: string): void {
     (e) => !JSON.stringify(e).includes("know-code"),
   );
   filtered.push({
-    command: `KNOW_CODE_HOOK_FORMAT=cursor ${shellQuote(scriptPath)}`,
+    command: hookCommand("cursor", scriptPath),
     matcher: "git push|gh pr create|glab mr create",
   });
   writeJson(destPath, {
@@ -196,7 +196,7 @@ function mergeCodexHooks(destPath: string, scriptPath: string): void {
     hooks: [
       {
         type: "command",
-        command: `KNOW_CODE_HOOK_FORMAT=codex ${shellQuote(scriptPath)}`,
+        command: hookCommand("codex", scriptPath),
       },
     ],
   });
@@ -206,6 +206,7 @@ function mergeCodexHooks(destPath: string, scriptPath: string): void {
   });
 }
 
-function shellQuote(path: string): string {
-  return `'${path.replace(/'/g, `'\\''`)}'`;
+function hookCommand(format: string, scriptPath: string): string {
+  const quoted = `'${scriptPath.replace(/'/g, `'\\''`)}'`;
+  return `KNOW_CODE_HOOK_FORMAT=${format} bash ${quoted}`;
 }
