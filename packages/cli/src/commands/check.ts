@@ -3,6 +3,7 @@ import { isSignedGateOpen, readGate } from "../gate.js";
 import { resolveQuizContext } from "../hash.js";
 import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
+import { isSealedRewriteRangeOpen, readRangeSeal } from "../range.js";
 
 export function cmdCheck(): never {
   const repoRoot = findGitRoot();
@@ -26,6 +27,14 @@ export function cmdCheck(): never {
   if (isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
     console.error(
       `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
+    );
+    process.exit(0);
+  }
+
+  if (isSealedRewriteRangeOpen(repoRoot)) {
+    const seal = readRangeSeal(repoRoot)!;
+    console.error(
+      `know-code: gate open (sealed rewrite range) for ${seal.diffHash.slice(0, 12)}…`,
     );
     process.exit(0);
   }

@@ -34,24 +34,34 @@ export function bundledHooksDir(): string {
 export function gitGateHookScript(): string {
   return `#!/usr/bin/env bash
 ${HOOK_MARKER}
-# Blocks commit/push unless know-code quiz receipt matches the current index diff.
-# OVERRIDE is handled inside \`know-code check\` (requires prior \`know-code override\` on a TTY).
+# Blocks commit/push unless know-code check passes.
+# Prefer repo-local CLI (monorepo dev) over global know-code on PATH.
 set -euo pipefail
 
-if command -v know-code >/dev/null 2>&1; then
-  exec know-code check
-fi
+ROOT="$(git rev-parse --show-toplevel)"
 
-ROOT="\$(git rev-parse --show-toplevel)"
-if [[ -x "\$ROOT/node_modules/.bin/know-code" ]]; then
-  exec "\$ROOT/node_modules/.bin/know-code" check
-fi
-if [[ -f "\$ROOT/packages/cli/dist/index.js" ]]; then
-  exec node "\$ROOT/packages/cli/dist/index.js" check
-fi
+run_check() {
+  if [[ -f "$ROOT/packages/cli/dist/index.js" ]]; then
+    node "$ROOT/packages/cli/dist/index.js" check
+    return $?
+  fi
+  if [[ -x "$ROOT/node_modules/.bin/know-code" ]]; then
+    "$ROOT/node_modules/.bin/know-code" check
+    return $?
+  fi
+  if command -v know-code >/dev/null 2>&1; then
+    know-code check
+    return $?
+  fi
+  if command -v npx >/dev/null 2>&1; then
+    npx --yes know-code check
+    return $?
+  fi
+  return 127
+}
 
-if command -v npx >/dev/null 2>&1; then
-  exec npx --yes know-code check
+if run_check; then
+  exit 0
 fi
 
 echo "know-code: CLI not found. Install with: npm i -g @chtnnh/know-code" >&2

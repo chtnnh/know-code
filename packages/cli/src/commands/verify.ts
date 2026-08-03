@@ -2,6 +2,7 @@ import { readConfig } from "../config.js";
 import { git, mergeBase } from "../git.js";
 import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
+import { readRangeSeal } from "../range.js";
 import { rangeHasTipTrailers } from "../trailers.js";
 
 function trailersInRange(repoRoot: string, from: string, to: string): string[] {
@@ -45,9 +46,17 @@ export function cmdVerify(opts: {
   const mb = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
   const fromOid = ctx.rangeFromOid || mb;
 
-  if (opts.requireRangeTrailers && ctx.scope === "range" && fromOid) {
-    if (rangeHasTipTrailers(repoRoot, fromOid, ctx.diffHash)) {
-      console.log("know-code: all commits in range have matching trailers");
+  if (opts.requireRangeTrailers) {
+    const seal = readRangeSeal(repoRoot);
+    const trailerFrom = seal?.rangeFromOid ?? (ctx.scope === "range" ? fromOid : mb);
+    const trailerHash = seal?.diffHash ?? ctx.diffHash;
+    if (
+      trailerFrom &&
+      rangeHasTipTrailers(repoRoot, trailerFrom, trailerHash)
+    ) {
+      console.log(
+        `know-code: all commits in range have Know-Code-Verified: ${trailerHash.slice(0, 12)}…`,
+      );
       process.exit(0);
     }
     console.error(

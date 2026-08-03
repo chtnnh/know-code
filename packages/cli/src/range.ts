@@ -8,7 +8,10 @@ import {
 import { join } from "node:path";
 import { readConfig } from "./config.js";
 import { git, mergeBase, resolveBaseRef } from "./git.js";
+import { isSignedGateOpen, readGate } from "./gate.js";
 import { knowCodeDir, rangeSealPath } from "./paths.js";
+import { assertSigned } from "./seal.js";
+import { rangeHasTipTrailers } from "./trailers.js";
 import type { RangeSealReceipt } from "./types.js";
 
 export interface RangeSession {
@@ -110,4 +113,32 @@ export function writeRangeSeal(
 export function clearRangeSeal(repoRoot: string): void {
   const path = rangeSealPath(repoRoot);
   if (existsSync(path)) unlinkSync(path);
+}
+
+/** After range seal --rewrite, index hash differs but trailers + gate match the sealed range. */
+export function isSealedRewriteRangeOpen(repoRoot: string): boolean {
+  const seal = readRangeSeal(repoRoot);
+  if (!seal || seal.sealMode !== "rewrite" || !seal.rangeFromOid) {
+    return false;
+  }
+  const config = readConfig(repoRoot);
+  const gate = readGate(repoRoot);
+  if (!isSignedGateOpen(repoRoot, gate, seal.diffHash, config.level)) {
+    return false;
+  }
+  if (config.requireAttest) {
+    try {
+      assertSigned(
+        repoRoot,
+        "range-seal.json",
+        seal as unknown as Record<string, unknown> & {
+          sig?: string;
+          keyId?: string;
+        },
+      );
+    } catch {
+      return false;
+    }
+  }
+  return rangeHasTipTrailers(repoRoot, seal.rangeFromOid, seal.diffHash);
 }
