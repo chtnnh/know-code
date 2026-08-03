@@ -1,7 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
+import { readConfig, resolveLevel } from "../config.js";
+import { writeAnswers } from "../attest.js";
+import { resolveQuizContext } from "../hash.js";
+import {
+  collectQuotaSignals,
+  computeQuestionQuota,
+  resolveQuotaFrom,
+} from "../questions.js";
 import { findGitRoot, knowCodeDir } from "../paths.js";
 
 export interface QuizQuestion {
@@ -238,6 +246,27 @@ export async function cmdAsk(opts: {
   }
 
   const quiz = loadQuiz(quizPath);
+  const config = readConfig(repoRoot);
+  const ctx = resolveQuizContext(repoRoot, config);
+  if (quiz.diffHash !== ctx.diffHash) {
+    throw new Error(
+      `Quiz diffHash does not match current ${ctx.scope} hash.\n` +
+        `  quiz:    ${quiz.diffHash}\n` +
+        `  current: ${ctx.diffHash}\n` +
+        `Re-run know-code questions and rewrite quiz.json.`,
+    );
+  }
+  const fromRef = resolveQuotaFrom(repoRoot, config.baseBranch, ctx.rangeFromOid);
+  const level = resolveLevel(repoRoot, quiz.level);
+  const quota = computeQuestionQuota(
+    collectQuotaSignals(repoRoot, level, fromRef),
+  );
+  if (quiz.questions.length < quota.minQuestions) {
+    throw new Error(
+      `Quiz has ${quiz.questions.length} questions but need at least ${quota.minQuestions}.\n` +
+        `Run: know-code questions`,
+    );
+  }
   const port = Number(opts.port || process.env.KNOW_CODE_QUIZ_PORT || "3847");
   const timeoutSec = Number(
     opts.timeout || process.env.KNOW_CODE_QUIZ_TIMEOUT || "1800",
@@ -291,9 +320,8 @@ export async function cmdAsk(opts: {
     });
   });
 
-  mkdirSync(knowCodeDir(repoRoot), { recursive: true });
+  writeAnswers(repoRoot, result);
   const outPath = join(knowCodeDir(repoRoot), "answers.json");
-  writeFileSync(outPath, `${JSON.stringify(result, null, 2)}\n`);
   console.error(`know-code: answers written → ${outPath}`);
   console.log(JSON.stringify(result, null, 2));
 }
