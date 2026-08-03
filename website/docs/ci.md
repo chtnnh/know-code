@@ -1,5 +1,5 @@
 ---
-sidebar_position: 6
+sidebar_position: 7
 title: CI & GitHub Action
 ---
 
@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: chtnnh/know-code/action@v0.1.2
+      - uses: chtnnh/know-code/action@v0.1.4
         with:
           base-branch: main
 ```
@@ -38,14 +38,15 @@ jobs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `base-branch` | `main` | Must match local config (`know-code config`) |
+| `base-branch` | `main` | Must match local `baseBranch` (`know-code config`) |
 | `require-all` | `false` | Stricter messaging when trailers missing |
-| `version` | `^0.1.2` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
+| `version` | `^0.1.4` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
 
 ## What verify checks
 
 1. **Primary:** HEAD commit message contains `Know-Code-Verified: <current-hash>`.
-2. **Secondary:** If HEAD is ahead of the base branch, scan trailers on that range only (not the entire repository history).
+2. **Secondary:** If HEAD is ahead of the base branch, scan trailers on that range only.
+3. **`--require-range-trailers`:** After `range seal --rewrite`, every commit from `rangeFromOid` must carry the sealed hash (reads `.know-code/range-seal.json`).
 
 Use `know-code commit -m "…"` locally so the trailer is attached automatically.
 

@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 title: Skills
 ---
 
@@ -11,40 +11,40 @@ Two complementary skills ship in this repository under `skills/`.
 
 Explains architecture, decisions, and trade-offs **before** edits and while coding. It never opens the gate.
 
-Use it at session start, before non-trivial work, after a gate deny (before the quiz), or when you ask the agent to catch you up.
+Use at session start, before non-trivial work, after a gate deny (before the quiz), or when you ask the agent to catch you up.
 
-Skip only if you explicitly say so (“skip teach”, “just do it”). After teach or skip, the agent records `know-code taught` (or `taught --skip`).
+At feature start, pair with `know-code range begin`. Skip only if you explicitly say so (“skip teach”, “just do it”). After teach or skip, the **human** seals `know-code taught`.
 
 ## know-code
 
-Gates commit / push / PR until you pass a browser quiz about the **current** staged diff. The agent:
+Gates commit / push / PR until you pass a browser quiz. Typical agent steps:
 
-1. Ensures the human sealed `know-code taught` for the current hash  
-2. Reads the level and hash  
-3. Writes `.know-code/quiz.json`  
-4. Runs `know-code ask`  
-5. Proposes a grade; the **human** seals `know-code grade` (≥80%)  
-6. The **human** seals `know-code pass`  
-7. Commits with `know-code commit -m "…"` so the CI trailer is automatic  
+1. Ensure `know-code range begin` is active for multi-commit work
+2. Ensure the human sealed `know-code taught` for the current hash
+3. Run `know-code questions --json`, write `.know-code/quiz.json`
+4. Run `know-code ask`
+5. Human seals `grade` (≥80%) and `pass`
+6. Human runs `know-code commit -m "…"` (quote the message)
+7. Human runs `know-code range seal` when the batch is done
 
-Hard rules: do not quiz in chat when the browser form is available; never forge seals or set `KNOW_CODE_OVERRIDE` / `KNOW_CODE_ATTEST_PASSPHRASE` from the agent.
+Hard rules: quiz in the **browser**, not chat; never forge seals or set `KNOW_CODE_OVERRIDE` / `KNOW_CODE_ATTEST_PASSPHRASE` from the agent.
 
 ## Install into your harness
 
-**Project** (committed with the repo / shared with the team):
+**Project** (committed with the repo):
 
 ```bash
 know-code skills
-# or: npx skills add chtnnh/know-code
 ```
 
-**Global** (your user profile — available in every repo for Cursor, Claude Code, Codex, …):
+**Global** (every repo — Cursor, Claude Code, Codex, …):
 
 ```bash
 know-code skills --global
-# or: npx skills add chtnnh/know-code --global
 ```
 
-Global installs land under harness home dirs such as `~/.cursor/skills/`, `~/.claude/skills/`, and `~/.codex/skills/`. List with `npx skills ls -g`.
+Global installs land under `~/.cursor/skills/`, `~/.claude/skills/`, `~/.codex/skills/`. List with `npx skills ls -g`.
 
-You can still symlink `skills/know-code` and `skills/know-code-teach` into `.agents/skills/` manually (this repo keeps committed links).
+Optional flags: `know-code skills --agents claude,cursor --yes`
+
+This repo keeps committed copies under `.agents/skills/`. Local harness links: `npm run link-skills` (gitignored).

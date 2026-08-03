@@ -1,5 +1,5 @@
 ---
-sidebar_position: 7
+sidebar_position: 8
 title: Troubleshooting
 ---
 
@@ -11,31 +11,57 @@ title: Troubleshooting
 know-code: commit/push blocked — diff changed since last quiz.
 ```
 
-Stage the intended changes, then (human seals — use your own terminal):
+Stage intended changes, then in **your** terminal:
 
 ```bash
-know-code attest-init            # once, if needed
-know-code taught                 # or taught --skip
+know-code range begin              # if multi-commit batch
+know-code taught                   # or taught --skip
+know-code questions --json         # agent writes quiz.json
 know-code ask --quiz .know-code/quiz.json
-know-code grade --score <0-1> --hash "$(know-code hash)"
+know-code grade --score 0.85 --hash "$(know-code hash)"
 know-code pass --level standard --hash "$(know-code hash)"
+know-code commit -m "your message"
 ```
 
-If `check` says the seal is missing/invalid, an agent may have written unsigned JSON — re-run the human seal commands.
+If `check` says the seal is invalid, an agent may have written unsigned JSON — re-run the human seal commands.
 
-## Hash changed after I synced main
+## `know-code commit` says pass `-m "..."`
 
-Hashing uses empty-tree → index (not merge-base). Syncing `origin/main` alone should not change the hash. Staging or unstaging files will.
+The CLI must receive `-m` and the message as separate argv tokens. Always quote:
+
+```bash
+know-code commit -m "fix(cli): thing"
+# monorepo: npm run know-code -- commit -m "fix(cli): thing"
+```
+
+## Hash changed / scope confusion
+
+- **Index scope:** hash = empty-tree → index (staged + HEAD tree). Syncing `origin/main` without staging changes usually does not change it.
+- **Range scope:** hash = cumulative `fromOid...HEAD` while `range begin` is active. See `know-code config --json`.
+
+## After `range seal --rewrite`
+
+Trailers use the **range** hash from `range-seal.json`, not the post-seal index hash. Verify with:
+
+```bash
+know-code verify --require-range-trailers
+```
+
+Push uses `check`, which reads the sealed range when trailers match.
+
+## Global `know-code` vs monorepo build
+
+Git hooks prefer `packages/cli/dist/index.js` when present. If push fails but `npm run know-code -- check` passes, reinstall hooks: `know-code init` or refresh `.git/hooks/pre-push`.
 
 ## Cursor hook fired on a non-git command
 
-Cursor’s matcher looks for real `git commit` / `git push` / `gh pr create` invocations. The shell hook only gates the **parsed** `command` field — not incidental text inside JSON or heredocs. Re-run `know-code init --agents cursor` to refresh `.cursor/hooks.json`.
+The shell hook only gates the **parsed** `command` field — not incidental text in JSON or heredocs. Re-run `know-code init --agents cursor` to refresh `.cursor/hooks.json`.
 
 ## CI failed: no matching trailer
 
 ```bash
 know-code hash
-know-code commit -m "your message"   # adds Know-Code-Verified
+know-code commit -m "your message"
 ```
 
 Amending without changing the tree keeps the same hash; changing files requires a new quiz.
@@ -47,15 +73,15 @@ Amending without changing the tree keeps the same hash; changing files requires 
 ## Emergency bypass (human TTY only)
 
 ```bash
-know-code override               # interactive: type OVERRIDE
-KNOW_CODE_OVERRIDE=1 git commit  # one-shot; consumes allow (10m TTL)
+know-code override
+KNOW_CODE_OVERRIDE=1 git commit
 ```
 
-Env alone is not enough. Agent hooks and CI deny `KNOW_CODE_OVERRIDE`. Logged under `.know-code/override.log`. CI still requires a trailer.
+Denied in agent hooks and CI. Logged under `.know-code/override.log`.
 
 ## pass refused: missing taught / answers / grade
 
-`know-code pass` needs matching **sealed** artifacts for the **current** hash. Re-run `taught`, complete `ask`, then `grade --score … --hash …` before `pass` — all in a human terminal with your attest passphrase.
+`know-code pass` needs matching **sealed** artifacts for the **current** hash. Re-run `taught`, complete `ask`, then `grade` before `pass` — in a human terminal with your attest passphrase.
 
 ## attest not initialized
 
@@ -63,4 +89,4 @@ Env alone is not enough. Agent hooks and CI deny `KNOW_CODE_OVERRIDE`. Logged un
 know-code attest-init
 ```
 
-Creates a passphrase-encrypted Ed25519 key under `~/.know-code/attest/` (public key in `meta.json` beside it). Nothing attest-related is committed to git.
+Creates a passphrase-encrypted Ed25519 key under `~/.know-code/attest/` (public key in `meta.json`). Nothing attest-related is committed to git.

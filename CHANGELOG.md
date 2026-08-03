@@ -21,6 +21,13 @@
 - Human **Ed25519 attest seals** on `taught` / `grade` / `pass` / `range-seal` (`requireAttest: true` default)
 - `know-code pass` requires taught + answers + grade; `KNOW_CODE_OVERRIDE` needs TTY `know-code override`
 
+### Fixes (post-release)
+- **`verify --require-range-trailers`** reads `range-seal.json` after `range seal --rewrite`
+- **`check`** prefers current gate over stale sealed range; honors sealed rewrite for push
+- **Git hooks** resolve monorepo `packages/cli/dist/index.js` before global `know-code`
+- **`commit -m`** parsing forwards `-m` flag correctly
+- **Docs:** config reference page, aligned CLI/skills/CI/troubleshooting across site and READMEs
+
 ## 0.1.3
 
 ### Package

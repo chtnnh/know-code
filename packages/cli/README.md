@@ -2,7 +2,7 @@
 
 **Agents don’t push until you know exactly what’s changed.**
 
-CLI that gates `git commit` / `git push` / PR creation until a human passes a browser comprehension quiz about the staged diff. Pair with the [know-code Agent Skills](https://github.com/chtnnh/know-code) in Claude Code, Cursor, Codex, and other agentskills.io harnesses.
+CLI that gates `git commit` / `git push` / PR creation until a human passes a browser comprehension quiz. Pair with the [know-code Agent Skills](https://github.com/chtnnh/know-code).
 
 **Docs:** [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org) · **Repo:** [chtnnh/know-code](https://github.com/chtnnh/know-code)
 
@@ -11,22 +11,47 @@ CLI that gates `git commit` / `git push` / PR creation until a human passes a br
 ```bash
 npm i -g @chtnnh/know-code
 know-code init --level standard --agents claude,cursor,codex --workflow
-know-code attest-init   # human passphrase — seals taught/grade/pass
+know-code attest-init   # human passphrase — once per machine
+```
+
+## Range workflow (recommended)
+
+One quiz per feature batch — not per commit.
+
+```bash
+know-code range begin
+# agent: know-code-teach → you: know-code taught
+know-code questions --json          # agent writes .know-code/quiz.json
+know-code ask --quiz .know-code/quiz.json
+know-code grade --score 0.85 --hash "$(know-code hash)"
+know-code pass --level standard --hash "$(know-code hash)"
+know-code commit -m "feat: first slice"
+# … more commits in the range …
+know-code range seal                # or --rewrite + git push --force-with-lease
+git push
 ```
 
 ## Everyday commands
 
+| Command | Who |
+|---------|-----|
+| `know-code config` | either |
+| `know-code questions` | agent |
+| `know-code taught` / `grade` / `pass` | **human** (attest passphrase) |
+| `know-code ask` | human answers in browser |
+| `know-code commit -m "…"` | human (quote the message) |
+| `know-code check` | hooks / CI helper |
+| `know-code verify` | CI / local trailer check |
+
 ```bash
 know-code status
-know-code taught                 # human seal (after know-code-teach)
-know-code ask --quiz .know-code/quiz.json
-know-code grade --score 0.85 --hash "$(know-code hash)"   # human seal
-know-code pass --level standard --hash "$(know-code hash)" # human seal
-know-code commit -m "feat: …"
-know-code verify
+know-code hash
+know-code verify --require-range-trailers   # after range seal --rewrite
 ```
 
-`check` rejects unsigned or forged `gate.json`. Sealing is denied in agent hooks.
+## Config
+
+Merged from `~/.know-code/config.json` + `.know-code/config.json` (local, gitignored). Fields: `level`, `baseBranch`, `requireTrailer`, `rangeMode`, `rangeSeal`, `requireAttest`. See [config docs](https://kc.chtnnhfoundation.org/docs/config).
 
 ## Emergency bypass (human TTY)
 
@@ -34,6 +59,8 @@ know-code verify
 know-code override
 KNOW_CODE_OVERRIDE=1 git commit
 ```
+
+Denied in agent hooks and CI.
 
 ## License
 

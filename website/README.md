@@ -2,10 +2,9 @@
 
 Docusaurus site for [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org).
 
-Documents the sealed gate flow:
-
 ```text
-attest-init → taught → ask → grade → pass → know-code commit
+attest-init → range begin → taught → questions → ask → grade → pass
+  → commit → range seal → push
 ```
 
 ```bash

@@ -56,14 +56,16 @@ know-code ask --quiz .know-code/quiz.json
 ```bash
 know-code grade --score 0.85 --hash "$(know-code hash)"
 know-code pass --level standard --hash "$(know-code hash)"
-know-code range seal           # optional: --rewrite for trailers on every commit
 ```
 
-### 5. Commit
+### 5. Commit + range seal
 
 ```bash
-know-code commit -m "<message>"
+know-code commit -m "<message>"   # always quote -m
+know-code range seal              # optional: --rewrite (force-push)
 ```
+
+Receipt mode: seal after commits; HEAD should have trailer. Rewrite mode: `range seal --rewrite` then `verify --require-range-trailers`.
 
 ## Hard rules
 

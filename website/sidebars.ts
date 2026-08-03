@@ -4,6 +4,7 @@ const sidebars: SidebarsConfig = {
   docsSidebar: [
     "intro",
     "how-it-works",
+    "config",
     "skills",
     "cli",
     "levels",

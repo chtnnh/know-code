@@ -8,35 +8,38 @@ title: Getting started
 
 **Your agents don’t push until you know exactly what’s changed.**
 
-know-code is a cross-harness [Agent Skill](https://agentskills.io) plus CLI that blocks `git commit`, `git push`, and PR creation until a **human** passes a short comprehension quiz about the current diff.
+know-code is a cross-harness [Agent Skill](https://agentskills.io) plus CLI that blocks `git commit`, `git push`, and PR creation until a **human** passes a comprehension quiz about the current diff.
 
 ## Install
 
 ```bash
-# CLI (scoped package; bin is still `know-code`)
 npm i -g @chtnnh/know-code
-
-# Or from GitHub
-npm i -g github:chtnnh/know-code#main:packages/cli
-
-# In your repository
 know-code init --level standard --agents claude,cursor,codex --workflow
+know-code attest-init          # once per machine
+```
 
-# Skills — this project, or every repo (--global)
+**Skills** — project or global:
+
+```bash
 know-code skills
 know-code skills --global
 ```
 
-`init --workflow` writes `.github/workflows/know-code.yml` that runs the [composite GitHub Action](/ci) on pull requests and pushes to `main`.
+`init --workflow` writes `.github/workflows/know-code.yml` using the [composite GitHub Action](/ci).
 
-## First loop
+## First loop (range workflow)
 
-1. Run `know-code attest-init` once (your passphrase seals taught/grade/pass).
-2. Let the agent run **know-code-teach**, then seal `know-code taught` in your terminal.
-3. Stage your changes. When blocked, answer `know-code ask` in the **browser**.
-4. Seal `know-code grade` and `know-code pass` yourself, then `know-code commit -m "…"`.
-5. Push. CI verifies the `Know-Code-Verified` trailer.
+```text
+range begin → teach → taught → questions → ask → grade → pass → commit → range seal → push
+```
 
-Unsigned/forged receipts never open the gate. Hooks gate shell commit/push/PR only — not edit tools.
+1. `know-code range begin` at the start of feature work.
+2. Agent runs **know-code-teach**; you seal `know-code taught` in your terminal.
+3. Agent runs `know-code questions`, writes `.know-code/quiz.json`, runs `know-code ask`.
+4. You answer in the **browser**, then seal `grade` and `pass`.
+5. `know-code commit -m "…"` for each commit (quote the message).
+6. `know-code range seal` when the batch is done; `git push` (or `--rewrite` + force-with-lease).
 
-Docs home: [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org) · Source: [github.com/chtnnh/know-code](https://github.com/chtnnh/know-code)
+Hooks gate shell commit/push/PR only — not edit tools. See [Configuration](/config) for all settings.
+
+Docs: [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org) · Source: [github.com/chtnnh/know-code](https://github.com/chtnnh/know-code)

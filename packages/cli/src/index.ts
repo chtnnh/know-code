@@ -27,29 +27,28 @@ Usage:
   know-code init [--level lite|standard|deep] [--base-branch main]
                  [--agents claude,cursor,codex] [--require-trailer] [--workflow]
   know-code config [--json]     # effective repo + home config
-  know-code attest-init [--force]
+  know-code attest-init [--force] [--passphrase <secret>]
   know-code range begin [--from <ref>]
   know-code range status [--json]
-  know-code range seal [--rewrite]
+  know-code range seal [--rewrite] [--passphrase <secret>]
   know-code range abort
   know-code questions [--json] [--from <ref>] [--level …]
-  know-code taught [--skip] [--hash <diffHash>]
-  know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--timeout 1800]
-  know-code grade --score <0-1> --hash <diffHash> [--level …]
-  know-code pass --level <lite|standard|deep> --hash <diffHash>
+  know-code taught [--skip] [--hash <diffHash>] [--passphrase <secret>]
+  know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--timeout 1800] [--no-open]
+  know-code grade --score <0-1> --hash <diffHash> [--level …] [--passphrase <secret>]
+  know-code pass --level <lite|standard|deep> --hash <diffHash> [--passphrase <secret>]
   know-code check
   know-code commit -m "<message>" [--no-trailer]
   know-code override
-  know-code status|hash|verify [--require-range-trailers]
-  know-code skills [--global]
-  know-code help
+  know-code status|hash|verify [--require-all] [--require-range-trailers]
+  know-code skills [--global] [--agents …] [-y]
+  know-code version|help
 
 Flow (range — one quiz per feature branch):
-  attest-init → range begin → taught → questions → ask → grade → pass → range seal → push
+  attest-init → range begin → taught → questions → ask → grade → pass → commit → range seal → push
 
 Config: ~/.know-code/config.json (defaults) + .know-code/config.json (local, gitignored)
-
-Docs: https://kc.chtnnhfoundation.org
+Docs: https://kc.chtnnhfoundation.org/docs/config
 `;
 
 function parseArgs(argv: string[]): {
