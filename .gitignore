@@ -9,9 +9,8 @@ coverage/
 .turbo/
 .tmp-test/
 
-# Local gate state — keep shared config committed
-.know-code/*
-!.know-code/config.json
+# Local know-code state (per developer — not committed)
+.know-code/
 
 # Generated from hooks/ + LICENSE at repo root (see scripts/sync-hooks.mjs)
 packages/cli/hooks/

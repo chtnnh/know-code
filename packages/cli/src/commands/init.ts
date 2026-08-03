@@ -11,7 +11,7 @@ import { findGitRoot, knowCodeDir } from "../paths.js";
 import { DEFAULT_CONFIG, isLevel, type Config } from "../types.js";
 
 const DOCS = "https://kc.chtnnhfoundation.org";
-const ACTION_REF = "chtnnh/know-code/action@v0.1.2";
+const ACTION_REF = "chtnnh/know-code/action@v0.1.4";
 
 export function consumerWorkflowYaml(baseBranch: string): string {
   return `name: know-code
@@ -118,38 +118,51 @@ export function cmdInit(opts: {
   }
 
   console.log("");
-  console.log(`Config written → .know-code/config.json (level: ${config.level})`);
+  console.log(`Config written → .know-code/config.json (local, gitignored; level: ${config.level})`);
   console.log("");
   console.log("Next steps:");
   console.log("  1. npm i -g @chtnnh/know-code");
   console.log("  2. Skills (pick one):");
   console.log("       know-code skills              # this repo only");
   console.log("       know-code skills --global     # all repos (Cursor/Claude/Codex/…)");
-  console.log("  3. teach → implement → know-code ask (browser quiz) → know-code pass");
-  console.log('  4. know-code commit -m "…"   # adds Know-Code-Verified trailer');
+  console.log("  3. know-code attest-init && know-code range begin");
+  console.log("  4. taught → questions → ask → grade → pass → range seal");
   console.log(`Docs: ${DOCS}`);
 }
 
 function ensureGitignore(repoRoot: string): void {
   const gi = join(repoRoot, ".gitignore");
   const block = [
-    "# Local gate state — keep shared config committed",
-    ".know-code/*",
-    "!.know-code/config.json",
+    "# Local know-code state (per developer — not committed)",
+    ".know-code/",
   ].join("\n");
 
   if (!existsSync(gi)) {
     writeFileSync(gi, `${block}\n`);
     return;
   }
-  const content = readFileSync(gi, "utf8");
-  if (content.includes(".know-code/gate.json") || content.includes("!.know-code/config.json")) {
+  let content = readFileSync(gi, "utf8");
+  content = content
+    .replace(/# Local gate state[^\n]*\n\.know-code\/\*\n!\.know-code\/config\.json\n?/g, "")
+    .replace(/# Local know-code state[^\n]*\n\.know-code\/\*\n!\.know-code\/config\.json\n?/g, "");
+  if (content.includes("!.know-code/config.json")) {
+    content = content.replace(/\n?!\.know-code\/config\.json\n?/g, "\n");
+  }
+  if (content.includes(".know-code/") && !content.includes("!.know-code/config.json")) {
     return;
   }
   if (!content.includes(".know-code")) {
     writeFileSync(
       gi,
       content.endsWith("\n") ? `${content}${block}\n` : `${content}\n${block}\n`,
+    );
+  } else if (content.includes(".know-code/*") && !content.includes(".know-code/")) {
+    writeFileSync(
+      gi,
+      content.replace(
+        /# Local[^\n]*\n\.know-code\/\*\n?/,
+        `${block}\n`,
+      ),
     );
   }
 }
