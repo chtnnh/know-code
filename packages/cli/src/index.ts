@@ -60,7 +60,8 @@ function parseArgs(argv: string[]): {
 } {
   const [command = "help", sub0, ...rest0] = argv;
   if (command === "commit") {
-    return { command, flags: {}, rest: rest0 };
+    const all = sub0 ? [sub0, ...rest0] : rest0;
+    return { command, flags: {}, rest: all };
   }
   if (command === "range") {
     const flags: Record<string, string | boolean> = {};

@@ -55,7 +55,8 @@ export function cmdCommit(rawArgs: string[]): void {
   }
 }
 
-function injectTrailer(args: string[], hash: string): string[] {
+/** @internal exported for tests */
+export function injectTrailer(args: string[], hash: string): string[] {
   const trailer = `Know-Code-Verified: ${hash}`;
   const out: string[] = [];
   let injected = false;
