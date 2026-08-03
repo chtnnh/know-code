@@ -1,43 +1,52 @@
 import { readConfig } from "../config.js";
-import { isGateValid, readGate } from "../gate.js";
-import { computeDiffContext } from "../hash.js";
+import { isSignedGateOpen, readGate } from "../gate.js";
+import { resolveQuizContext } from "../hash.js";
+import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
 
 export function cmdCheck(): never {
+  const repoRoot = findGitRoot();
+
   if (process.env.KNOW_CODE_OVERRIDE === "1") {
-    console.error(
-      "know-code: KNOW_CODE_OVERRIDE=1 — check passed via override.",
-    );
-    process.exit(0);
+    const bypass = tryOverrideBypass(repoRoot);
+    if (bypass.allowed) {
+      console.error(
+        "know-code: KNOW_CODE_OVERRIDE=1 — check passed via human override (logged).",
+      );
+      process.exit(0);
+    }
+    console.error(bypass.reason || "know-code: OVERRIDE denied.");
+    process.exit(2);
   }
 
-  const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = computeDiffContext(repoRoot, config);
+  const ctx = resolveQuizContext(repoRoot, config);
   const receipt = readGate(repoRoot);
 
-  if (isGateValid(receipt, ctx.diffHash, config.level)) {
+  if (isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
     console.error(
-      `know-code: gate open (${receipt!.level}) for ${ctx.diffHash.slice(0, 12)}…`,
+      `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
     );
     process.exit(0);
   }
 
   const reason = !receipt
-    ? "no quiz receipt"
+    ? "no sealed quiz receipt"
     : receipt.diffHash !== ctx.diffHash
       ? "diff changed since last quiz"
-      : `receipt level "${receipt.level}" is below required "${config.level}"`;
+      : config.requireAttest && !receipt.sig
+        ? "gate.json missing human seal (forged or pre-attest)"
+        : `receipt level "${receipt.level}" is below required "${config.level}" or seal invalid`;
 
   console.error(`know-code: commit/push blocked — ${reason}.`);
   console.error(
-    `know-code: current hash ${ctx.diffHash} (level: ${config.level}).`,
+    `know-code: current hash ${ctx.diffHash} (scope: ${ctx.scope}, level: ${config.level}).`,
   );
   console.error(
-    "know-code: run know-code-teach (unless skipped), then the know-code skill / browser quiz, then retry.",
+    "know-code: flow: range begin → taught → questions → ask → grade → pass → range seal",
   );
   console.error(
-    "know-code: emergency bypass: KNOW_CODE_OVERRIDE=1 git commit|push",
+    "know-code: emergency (human TTY): know-code override && KNOW_CODE_OVERRIDE=1 …",
   );
   process.exit(2);
 }

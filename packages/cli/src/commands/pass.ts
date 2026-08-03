@@ -1,24 +1,43 @@
+import {
+  assertAnswersForHash,
+  assertGradeAnswersBinding,
+  assertGradeForHash,
+  assertTaughtForHash,
+} from "../attest.js";
 import { readConfig, resolveLevel } from "../config.js";
 import { writeGate } from "../gate.js";
-import { computeDiffContext } from "../hash.js";
+import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
+import { sealPayload } from "../seal.js";
 import { isLevel, type GateReceipt } from "../types.js";
 
-export function cmdPass(opts: {
+/**
+ * Open the gate. Human-sealed when requireAttest is true.
+ */
+export async function cmdPass(opts: {
   level?: string;
   hash?: string;
-}): void {
+  passphrase?: string;
+}): Promise<void> {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = computeDiffContext(repoRoot, config);
+  const ctx = resolveQuizContext(repoRoot, config);
   const level = resolveLevel(repoRoot, opts.level);
 
-  if (opts.hash && opts.hash !== ctx.diffHash) {
+  if (!opts.hash) {
+    console.error(
+      "know-code: pass requires --hash <diffHash> (bind the gate to the quizzed diff).",
+    );
+    process.exit(1);
+  }
+
+  if (opts.hash !== ctx.diffHash) {
     console.error(
       `know-code: provided hash does not match current diff.\n` +
         `  provided: ${opts.hash}\n` +
         `  current:  ${ctx.diffHash}\n` +
-        `Re-run the quiz against the current diff.`,
+        `  scope:    ${ctx.scope}\n` +
+        `Re-run teach / quiz against the current diff.`,
     );
     process.exit(1);
   }
@@ -28,7 +47,19 @@ export function cmdPass(opts: {
     process.exit(1);
   }
 
-  const receipt: GateReceipt = {
+  let answers;
+  let grade;
+  try {
+    assertTaughtForHash(repoRoot, ctx.diffHash);
+    answers = assertAnswersForHash(repoRoot, ctx.diffHash);
+    grade = assertGradeForHash(repoRoot, ctx.diffHash);
+    assertGradeAnswersBinding(grade, answers);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+
+  const unsigned: Omit<GateReceipt, "keyId" | "sig"> = {
     version: 1,
     diffHash: ctx.diffHash,
     level,
@@ -36,16 +67,35 @@ export function cmdPass(opts: {
     commitRange: ctx.commitRange,
     baseRef: ctx.baseRef,
     headRef: ctx.headRef,
+    scope: ctx.scope,
+    rangeFromOid: ctx.rangeFromOid,
+    commitCount: ctx.commitCount,
+    answersDigest: answers.answersDigest,
   };
 
-  writeGate(repoRoot, receipt);
-  console.log(`know-code: gate passed (${level})`);
+  try {
+    const sealed = (await sealPayload(
+      repoRoot,
+      unsigned as unknown as Record<string, unknown>,
+      { passphrase: opts.passphrase },
+    )) as unknown as GateReceipt;
+    writeGate(repoRoot, sealed);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+
+  console.log(`know-code: gate sealed (${level}, scope=${ctx.scope})`);
   console.log(`know-code: hash ${ctx.diffHash}`);
+  if (ctx.scope === "range") {
+    console.log(
+      "know-code: next: know-code range seal   # finish range (optional --rewrite)",
+    );
+  }
   console.log(
     "know-code: optional commit trailer: Know-Code-Verified: " + ctx.diffHash,
   );
   console.log(
     'know-code: commit with: know-code commit -m "<message>" (adds Know-Code-Verified trailer)',
   );
-  console.log("know-code: then retry push / gh pr create as needed");
 }
