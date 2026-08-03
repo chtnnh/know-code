@@ -31,10 +31,12 @@ know-code skills --global
 
 ## First loop
 
-1. Let the agent run **know-code-teach** before non-trivial edits (or skip explicitly).
-2. Stage your changes.
-3. When commit/push is blocked, the agent writes a quiz and runs `know-code ask` — answer in the **browser form**, not chat.
-4. After a pass: `know-code pass` then `know-code commit -m "…"`.
+1. Run `know-code attest-init` once (your passphrase seals taught/grade/pass).
+2. Let the agent run **know-code-teach**, then seal `know-code taught` in your terminal.
+3. Stage your changes. When blocked, answer `know-code ask` in the **browser**.
+4. Seal `know-code grade` and `know-code pass` yourself, then `know-code commit -m "…"`.
 5. Push. CI verifies the `Know-Code-Verified` trailer.
+
+Unsigned/forged receipts never open the gate. Hooks gate shell commit/push/PR only — not edit tools.
 
 Docs home: [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org) · Source: [github.com/chtnnh/know-code](https://github.com/chtnnh/know-code)

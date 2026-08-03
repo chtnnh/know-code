@@ -38,7 +38,7 @@ jobs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `base-branch` | `main` | Must match local `.know-code/config.json` |
+| `base-branch` | `main` | Must match local config (`know-code config`) |
 | `require-all` | `false` | Stricter messaging when trailers missing |
 | `version` | `^0.1.2` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
 
@@ -61,4 +61,4 @@ Requires `gh` with admin access. Mark **know-code** (and preferably **ci**) as r
 
 ## Overrides
 
-`KNOW_CODE_OVERRIDE=1` is local-only and is logged to `.know-code/override.log`. It never satisfies CI.
+`KNOW_CODE_OVERRIDE=1` is local-only, requires a prior `know-code override` on a TTY, is denied in agent hooks, and is logged to `.know-code/override.log`. It never satisfies CI.

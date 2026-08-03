@@ -30,6 +30,17 @@ Ask for a decision only when it matters. Examples:
 - Persist in DB vs cache?
 - Break API now vs compat shim?
 
+## After the first teach beat
+
+Ask the human to seal understanding for the current index hash:
+
+```bash
+know-code taught
+# or: know-code taught --skip
+```
+
+Agents cannot forge a valid seal — this must run in a human terminal (attest passphrase).
+
 ## While coding
 
 After each coherent chunk (not every tiny edit):

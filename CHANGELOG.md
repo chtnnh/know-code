@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.4
+
+### Range workflow (less cumbersome)
+- **`know-code range begin`** — pin merge-base; one quiz covers all commits until `range seal`
+- **`know-code range seal`** — default receipt mode (no history rewrite); optional **`--rewrite`** stamps `Know-Code-Verified` on every commit in range (force-push required)
+- Cumulative **range hash** (`fromOid...HEAD` + staged) used when a range session is active
+- Config: `rangeMode` (`auto`|`index`|`range`), `rangeSeal` (`receipt`|`rewrite`)
+
+### Question quota
+- **`know-code questions`** — agent runs before writing `quiz.json`; `ask` enforces minimum count from diff size, languages, commit count, and level
+
+### Config layering
+- **`~/.know-code/config.json`** — user defaults (optional)
+- **`.know-code/config.json`** — per-developer repo settings (gitignored; created by `know-code init`)
+- Attest keys live under **`~/.know-code/attest/`** only (never committed)
+- **`know-code config`** — show merged effective settings
+
+### Enforcement (from earlier 0.1.4 work)
+- Human **Ed25519 attest seals** on `taught` / `grade` / `pass` / `range-seal` (`requireAttest: true` default)
+- `know-code pass` requires taught + answers + grade; `KNOW_CODE_OVERRIDE` needs TTY `know-code override`
+
 ## 0.1.3
 
 ### Package

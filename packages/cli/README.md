@@ -11,43 +11,29 @@ CLI that gates `git commit` / `git push` / PR creation until a human passes a br
 ```bash
 npm i -g @chtnnh/know-code
 know-code init --level standard --agents claude,cursor,codex --workflow
-```
-
-The npm binary is `know-code` (package name is scoped because unscoped `know-code` collides with `knowcode` on npm).
-
-## Skills (project or global)
-
-```bash
-# This repo / project only
-know-code skills
-# same as: npx skills add chtnnh/know-code
-
-# All repos — install into your user harness dirs (~/.cursor/skills, ~/.claude/skills, …)
-know-code skills --global
-# same as: npx skills add chtnnh/know-code --global
+know-code attest-init   # human passphrase — seals taught/grade/pass
 ```
 
 ## Everyday commands
 
 ```bash
 know-code status
+know-code taught                 # human seal (after know-code-teach)
 know-code ask --quiz .know-code/quiz.json
-know-code pass --level standard --hash "$(know-code hash)"
-know-code commit -m "feat: …"    # adds Know-Code-Verified trailer
-know-code verify                 # CI
+know-code grade --score 0.85 --hash "$(know-code hash)"   # human seal
+know-code pass --level standard --hash "$(know-code hash)" # human seal
+know-code commit -m "feat: …"
+know-code verify
 ```
 
-## CI
+`check` rejects unsigned or forged `gate.json`. Sealing is denied in agent hooks.
 
-```yaml
-- uses: actions/checkout@v4
-  with: { fetch-depth: 0 }
-- uses: chtnnh/know-code/action@v0.1.2
-  with:
-    base-branch: main
+## Emergency bypass (human TTY)
+
+```bash
+know-code override
+KNOW_CODE_OVERRIDE=1 git commit
 ```
-
-Or `know-code init --workflow`.
 
 ## License
 

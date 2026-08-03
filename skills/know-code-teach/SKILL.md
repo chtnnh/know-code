@@ -9,7 +9,7 @@ description: >-
 compatibility: "works in any agentskills.io harness"
 metadata:
   author: chtnnh
-  version: "0.1.2"
+  version: "0.1.3"
 license: MIT
 ---
 
@@ -49,14 +49,25 @@ While coding, keep explanations **incremental**: after meaningful chunks, narrat
 | `know-code-teach` | Build understanding **before/during** work |
 | `know-code` | Verify understanding before commit/push/PR |
 
-**Required order:** teach → edit → (teach deltas) → `know-code` quiz → `know-code commit` / push.
+**Required order:** teach → human seals `know-code taught` → edit → (teach deltas) → `know-code` quiz → human seals grade/pass → `know-code commit` / push.
+
+After teaching (or an explicit human skip), the **human** seals the artifact (passphrase; agents cannot forge):
+
+```bash
+know-code taught
+# or, only if the human explicitly skipped:
+know-code taught --skip
+```
+
+Ask the human to run that in their terminal if you cannot obtain a TTY seal. Stage intended changes first when recording near quiz time — `taught.json` is keyed to the current index hash.
 
 After a gate deny: teach first, then quiz, unless the human explicitly skips teaching.
 
 ## Hard rules
 
 - Do **not** start non-trivial edits until you have taught (or the human skipped)
-- Do **not** run `know-code pass`
+- After teach/skip, run **`know-code taught`** (or `taught --skip`) before handing off to quiz/`pass`
+- Do **not** run `know-code pass` or `know-code grade`
 - Do **not** quiz here (hand off to `know-code`)
 - Prefer questions that invite the human to steer (“prefer A or B?”) over monologue
-- If the human is already expert and asks to skip teaching, comply and stay brief
+- If the human is already expert and asks to skip teaching, comply, stay brief, and run `know-code taught --skip`

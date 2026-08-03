@@ -2,25 +2,18 @@
 
 This repository dogfoods its own gate.
 
-- Skill source: `skills/know-code`, `skills/know-code-teach`
-- Committed links: `.agents/skills/`
-- Local Cursor/Claude links: `npm run link-skills` (gitignored)
-- Agent hooks: `.cursor/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`
-- Config: `.know-code/config.json` (`requireTrailer: true`)
-
 ## Required agent loop
 
-1. **know-code-teach** before non-trivial edits (unless human skips)
-2. Implement (teach deltas as you go)
-3. On gate deny / before ship: teach (if needed) → **know-code** browser quiz → `know-code pass`
-4. **Commit with `know-code commit -m "..."`** — always adds `Know-Code-Verified` trailer; do not wait for the human to ask for the trailer
-5. Push when shipping
+1. Human: `know-code attest-init` once
+2. **`know-code range begin`** at start of feature work
+3. **know-code-teach** → human seals **`know-code taught`**
+4. Agent: **`know-code questions`** → write quiz → **`know-code ask`**
+5. Human seals **`grade`** + **`pass`**
+6. Human: **`know-code range seal`** (or `--rewrite` if configured)
+7. **`know-code commit`** / push
 
-## Skills
+Never set `KNOW_CODE_OVERRIDE` or `KNOW_CODE_ATTEST_PASSPHRASE` from the agent.
 
-- **know-code-teach** — explain before/while coding (never opens the gate)
-- **know-code** — quiz in browser; `know-code pass`; ship via `know-code commit`
-
-CLI from this checkout: `npm run know-code -- …`
+CLI: `npm run know-code -- …`
 
 Docs: https://kc.chtnnhfoundation.org

@@ -8,99 +8,57 @@ Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commi
 
 ## How it works
 
-1. **Skill** — the host agent diffs your index and writes level-appropriate questions.
-2. **Browser quiz** — `know-code ask` opens a local form (not the agent chat).
-3. **CLI receipt** — on pass, `know-code pass` writes `.know-code/gate.json` keyed to a content hash of the patch.
-4. **Git + agent hooks** — deny commit / push / PR create until the receipt matches.
-5. **CI** — verifies a `Know-Code-Verified: <hash>` trailer on PRs and pushes to `main`.
+1. **Attest key** — `know-code attest-init` once (passphrase-encrypted Ed25519; pubkey in repo config).
+2. **Range session** — `know-code range begin` pins merge-base; **one quiz** covers all commits until `range seal`.
+3. **Question quota** — agent runs `know-code questions` before writing the quiz (count scales with diff/commits/level).
+4. **Human seals** — `taught` → browser `ask` → `grade` → `pass` (Ed25519; agents cannot forge).
+5. **Ship** — `range seal` (optional `--rewrite` for trailers on every commit) → push → CI verifies trailers.
 
 ```text
-teach → implement → quiz (browser) → know-code pass → know-code commit → push
+attest-init → range begin → teach → taught → questions → ask → grade → pass → range seal → push
 ```
+
+**Version note:** npm has **0.1.3** today; **0.1.4** (this branch) adds range workflow, question quota, and attest seals.
 
 ## Install
 
 ```bash
-# CLI (scoped — unscoped know-code is taken / blocked by npm)
 npm i -g @chtnnh/know-code
-
-# Fallback from GitHub
-npm i -g github:chtnnh/know-code#main:packages/cli
-
 know-code init --level standard --agents claude,cursor,codex --workflow
-
-# Skills — project only, or global (all repos)
-know-code skills
-know-code skills --global
-# equivalent: npx skills add chtnnh/know-code [--global]
+know-code attest-init
 ```
 
-`init --workflow` adds a GitHub Actions workflow that uses [`chtnnh/know-code/action@v0.1.2`](./action).
+Optional home defaults: `~/.know-code/config.json`. Per-repo settings in `.know-code/config.json` (gitignored, from `know-code init`).
 
-### Zed
-
-Zed has no PreToolUse-style shell hooks. Rely on git hooks from `know-code init` plus the skill under `.agents/skills/`.
-
-## Levels
-
-| Level | Questions | Focus |
-|-------|-----------|-------|
-| `lite` | 2–3 | What changed |
-| `standard` | 4–6 | Architecture + trade-offs (default) |
-| `deep` | 7–10 | Failure modes, security, migrations |
-
-## CLI
+## CLI highlights
 
 ```bash
-know-code init [--level …] [--base-branch main] [--agents …] [--workflow]
-know-code skills [--global] [--agents cursor,claude-code,…]
-know-code status [--json]
-know-code hash [--json]
-know-code check
-know-code pass --level standard --hash <diffHash>
-know-code ask [--quiz .know-code/quiz.json] [--timeout 1800]
-know-code commit -m "msg"   # use this — adds Know-Code-Verified trailer
-know-code verify
+know-code range begin
+know-code questions              # agent: before writing quiz.json
+know-code taught                 # human seal
+know-code ask
+know-code grade --score 0.85 --hash "$(know-code hash)"
+know-code pass --level standard --hash "$(know-code hash)"
+know-code range seal             # or --rewrite (force-push)
+know-code commit -m "msg"
+know-code config                 # effective settings
 ```
 
-Emergency bypass (local only; logged to `.know-code/override.log`):
+## Config
 
-```bash
-KNOW_CODE_OVERRIDE=1 git commit
-KNOW_CODE_OVERRIDE=1 git push
-```
-
-## CI for your repo
-
-```yaml
-# written by: know-code init --workflow
-- uses: actions/checkout@v4
-  with: { fetch-depth: 0 }
-- uses: chtnnh/know-code/action@v0.1.2
-  with:
-    base-branch: main
-```
-
-Mark **know-code** as a required status check. Helper: `node scripts/setup-branch-protection.mjs owner/repo main`.
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `rangeMode` | `auto` | Use range hash when `range begin` active |
+| `rangeSeal` | `receipt` | `rewrite` stamps every commit in range |
+| `requireAttest` | `true` | Human Ed25519 seals required |
 
 ## Development
 
 ```bash
-npm install   # links skills + syncs hooks into packages/cli
-npm run build
-npm test
+npm install && npm run build && npm test
+npm run smoke                    # isolated range + attest smoke
 npm run know-code -- status
-npm run build -w website   # docs site
 ```
-
-## Publish checklist (maintainers)
-
-1. Public GitHub repo  
-2. Pages: source = GitHub Actions; DNS `kc` CNAME → `chtnnh.github.io`  
-3. Publish: tag `v*` (e.g. `v0.1.3`) — [release.yml](.github/workflows/release.yml) uses npm **Trusted Publishing** (OIDC), no `NPM_TOKEN`  
-4. Smoke: `npm i -g @chtnnh/know-code` then `know-code --version`  
-
-See [CHANGELOG.md](./CHANGELOG.md).
 
 ## License
 

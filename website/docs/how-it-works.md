@@ -6,24 +6,30 @@ title: How it works
 # How it works
 
 ```text
-teach (before edits) → implement → hook deny?
-                ↓
-          know-code-teach (unless skipped) → quiz.json → know-code ask
-                ↓
-          grade → know-code pass → know-code commit -m "…" → push → CI
+attest-init → range begin → teach → taught (seal) → questions → ask
+  → grade (seal) → pass (seal) → range seal → commit / push → CI
 ```
 
-## Layers
+## Range mode
 
-1. **Skills** — the host agent explains the design (`know-code-teach`) and later quizzes you (`know-code`).
-2. **Browser quiz** — `know-code ask` opens a local form with one textarea per answer.
-3. **Receipt** — `know-code pass` writes `.know-code/gate.json` keyed to a content hash of the index (empty tree → staged tree).
-4. **Git hooks** — `pre-commit` / `pre-push` run `know-code check`.
-5. **Agent hooks** — Claude / Cursor / Codex deny gated shell commands until the receipt matches.
-6. **CI** — verifies `Know-Code-Verified: <hash>` on the commit (HEAD trailer first).
+`know-code range begin` pins merge-base. **One quiz** covers the cumulative diff `fromOid...HEAD` (+ staged). Human seals once; `range seal` finishes the session.
 
-## Hash model
+| `rangeSeal` | Behavior |
+|-------------|----------|
+| `receipt` (default) | Signed `range-seal.json`; HEAD should carry trailer for CI |
+| `rewrite` | `range seal --rewrite` stamps every commit (force-push) |
 
-The hash is SHA-256 of the patch from Git’s empty tree to the **current index**. Using a fixed floor (not merge-base) keeps the hash stable when `origin/main` catches up to HEAD, so you are not forced to re-quiz after a routine sync.
+## Attestation
 
-Message-only amends that do not change the tree keep the same hash.
+`attest-init` creates a passphrase key under `~/.know-code/attest/`. `taught`, `grade`, `pass`, and `range seal` produce Ed25519 signatures agents cannot forge without the passphrase.
+
+## Question quota
+
+`know-code questions` computes the minimum quiz size from level, lines/files changed, commit count, languages, and sensitive paths. `ask` rejects under-sized quizzes.
+
+## Config
+
+- `~/.know-code/config.json` — optional user defaults
+- `.know-code/config.json` — local repo settings (gitignored; each developer runs `know-code init`)
+- `~/.know-code/attest/` — passphrase-encrypted attest keys (never committed)
+- `know-code config` — show merged effective settings
