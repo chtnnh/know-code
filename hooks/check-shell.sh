@@ -3,6 +3,9 @@
 # Denies git commit / push / PR creation when know-code check fails.
 # Only the parsed command field is gated — never the raw stdin blob (avoids
 # false positives when quiz text / heredocs mention "git commit").
+#
+# KNOW_CODE_OVERRIDE is NEVER honored in agent hooks — humans must use a TTY
+# \`know-code override\` then KNOW_CODE_OVERRIDE=1 outside the agent.
 set -euo pipefail
 
 INPUT="$(cat || true)"
@@ -63,12 +66,12 @@ deny_json() {
   esac
 }
 
-log_override() {
+log_override_denied() {
   local root snippet
   root="$(resolve_root)"
   mkdir -p "$root/.know-code"
   snippet="$(printf '%s' "$CMD" | head -c 200 | tr '\n' ' ')"
-  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) override cmd=${snippet}" >> "$root/.know-code/override.log"
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) denied OVERRIDE in agent hook cmd=${snippet}" >> "$root/.know-code/override.log"
 }
 
 resolve_root() {
@@ -112,13 +115,13 @@ if ! should_gate "$CMD"; then
   exit 0
 fi
 
+# Agent hooks: never honor OVERRIDE env alone.
 if [[ "${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
-  log_override
-  allow_json
-  exit 0
+  log_override_denied
+  deny_json "know-code: OVERRIDE denied in agent hooks. Human: run know-code override on a TTY, then KNOW_CODE_OVERRIDE=1 outside the agent."
 fi
 
-REASON="know-code: blocked. Run know-code-teach first (unless skipped), then /know-code browser quiz, then retry. Bypass: KNOW_CODE_OVERRIDE=1"
+REASON="know-code: blocked. Flow: know-code taught → ask → grade → pass → know-code commit. Human emergency: know-code override"
 
 if run_check; then
   allow_json

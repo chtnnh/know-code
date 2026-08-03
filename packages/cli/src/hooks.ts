@@ -35,15 +35,8 @@ export function gitGateHookScript(): string {
   return `#!/usr/bin/env bash
 ${HOOK_MARKER}
 # Blocks commit/push unless know-code quiz receipt matches the current index diff.
+# OVERRIDE is handled inside \`know-code check\` (requires prior \`know-code override\` on a TTY).
 set -euo pipefail
-
-if [[ "\${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
-  echo "know-code: KNOW_CODE_OVERRIDE=1 — allowing (logged)." >&2
-  ROOT="\$(git rev-parse --show-toplevel)"
-  mkdir -p "\$ROOT/.know-code"
-  echo "\$(date -u +%Y-%m-%dT%H:%M:%SZ) git-hook override" >> "\$ROOT/.know-code/override.log"
-  exit 0
-fi
 
 if command -v know-code >/dev/null 2>&1; then
   exec know-code check
@@ -62,7 +55,7 @@ if command -v npx >/dev/null 2>&1; then
 fi
 
 echo "know-code: CLI not found. Install with: npm i -g @chtnnh/know-code" >&2
-echo "know-code: or set KNOW_CODE_OVERRIDE=1 to bypass once." >&2
+echo "know-code: emergency: know-code override && KNOW_CODE_OVERRIDE=1 …" >&2
 exit 1
 `;
 }
