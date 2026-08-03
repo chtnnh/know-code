@@ -1,7 +1,8 @@
 import { readConfig } from "../config.js";
 import { git, mergeBase } from "../git.js";
-import { computeDiffContext } from "../hash.js";
+import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
+import { rangeHasTipTrailers } from "../trailers.js";
 
 function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   const commits = git(["rev-list", "--reverse", `${from}..${to}`], repoRoot, {
@@ -28,32 +29,46 @@ function headHasTrailer(repoRoot: string, headRef: string, hash: string): boolea
   return new RegExp(`^Know-Code-Verified:\\s*${hash}\\s*$`, "im").test(headMsg);
 }
 
-export function cmdVerify(opts: { requireAll?: boolean }): void {
+export function cmdVerify(opts: {
+  requireAll?: boolean;
+  requireRangeTrailers?: boolean;
+}): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = computeDiffContext(repoRoot, config);
+  const ctx = resolveQuizContext(repoRoot, config);
 
   console.log(`know-code verify`);
   console.log(`  expected: ${ctx.diffHash}`);
+  console.log(`  scope:    ${ctx.scope}`);
   console.log(`  range:    ${ctx.commitRange}`);
 
-  // Primary: HEAD commit trailer must match current tree hash.
+  const mb = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
+  const fromOid = ctx.rangeFromOid || mb;
+
+  if (opts.requireRangeTrailers && ctx.scope === "range" && fromOid) {
+    if (rangeHasTipTrailers(repoRoot, fromOid, ctx.diffHash)) {
+      console.log("know-code: all commits in range have matching trailers");
+      process.exit(0);
+    }
+    console.error(
+      "know-code: --require-range-trailers: not every commit has Know-Code-Verified",
+    );
+    console.error("know-code: run: know-code range seal --rewrite");
+    process.exit(1);
+  }
+
   if (headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash)) {
     console.log("know-code: HEAD trailer verified");
     process.exit(0);
   }
 
-  // Secondary: scan only merge-base..HEAD when HEAD is ahead of base.
-  // Never scan empty-tree..HEAD (full history) when already on the base tip.
-  const mb = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
   const ahead = git(["rev-list", "--count", `${mb}..${ctx.headRef}`], repoRoot, {
     allowFail: true,
   });
   const aheadCount = Number.parseInt(ahead || "0", 10) || 0;
 
-  let trailers: string[] = [];
   if (aheadCount > 0 && mb !== ctx.headRef) {
-    trailers = trailersInRange(repoRoot, mb, ctx.headRef);
+    const trailers = trailersInRange(repoRoot, mb, ctx.headRef);
     console.log(`  trailers in ${mb.slice(0, 12)}..HEAD: ${trailers.length}`);
     if (trailers.includes(ctx.diffHash)) {
       console.log("know-code: verified (range)");

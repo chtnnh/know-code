@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { computeDiffContext } from "./hash.js";
-import type { Config } from "./types.js";
+import { DEFAULT_CONFIG, type Config } from "./types.js";
 
 const FIXTURE_ROOT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -22,8 +22,8 @@ function git(cwd: string, args: string[]): string {
 describe("computeDiffContext empty-tree floor", () => {
   let dir: string;
   const config: Config = {
+    ...DEFAULT_CONFIG,
     level: "standard",
-    baseBranch: "main",
     requireTrailer: true,
   };
 
@@ -78,8 +78,8 @@ describe("verify HEAD trailer helpers via temp repo", () => {
     writeFileSync(
       join(dir, ".know-code", "config.json"),
       JSON.stringify({
+        ...DEFAULT_CONFIG,
         level: "lite",
-        baseBranch: "main",
         requireTrailer: true,
       }),
     );
@@ -97,8 +97,8 @@ describe("verify HEAD trailer helpers via temp repo", () => {
     git(dir, ["add", "f.txt"]);
     const { computeDiffContext: ctxFn } = awaitImport();
     const hash = ctxFn(dir, {
+      ...DEFAULT_CONFIG,
       level: "lite",
-      baseBranch: "main",
       requireTrailer: true,
     }).diffHash;
     git(dir, [
@@ -108,8 +108,8 @@ describe("verify HEAD trailer helpers via temp repo", () => {
     ]);
     // After commit, index matches HEAD tree → same hash
     const after = ctxFn(dir, {
+      ...DEFAULT_CONFIG,
       level: "lite",
-      baseBranch: "main",
       requireTrailer: true,
     }).diffHash;
     assert.equal(after, hash);

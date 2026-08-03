@@ -1,25 +1,30 @@
 import { spawnSync } from "node:child_process";
 import { readConfig } from "../config.js";
-import { isGateValid, readGate } from "../gate.js";
-import { computeDiffContext } from "../hash.js";
+import { isSignedGateOpen, readGate } from "../gate.js";
+import { resolveQuizContext } from "../hash.js";
+import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
 
-/**
- * Wrapper around `git commit` that:
- * 1. Requires an open know-code gate (unless KNOW_CODE_OVERRIDE=1)
- * 2. Appends Know-Code-Verified: <hash> to the message (unless --no-trailer)
- */
 export function cmdCommit(rawArgs: string[]): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = computeDiffContext(repoRoot, config);
+  const ctx = resolveQuizContext(repoRoot, config);
 
-  if (process.env.KNOW_CODE_OVERRIDE !== "1") {
+  if (process.env.KNOW_CODE_OVERRIDE === "1") {
+    const bypass = tryOverrideBypass(repoRoot);
+    if (!bypass.allowed) {
+      console.error(bypass.reason || "know-code: OVERRIDE denied.");
+      process.exit(2);
+    }
+    console.error(
+      "know-code: committing via human OVERRIDE (logged; trailer still added unless --no-trailer).",
+    );
+  } else {
     const receipt = readGate(repoRoot);
-    if (!isGateValid(receipt, ctx.diffHash, config.level)) {
-      console.error("know-code: commit blocked — gate is closed.");
+    if (!isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
+      console.error("know-code: commit blocked — gate is closed or seal invalid.");
       console.error(
-        "know-code: run know-code-teach (unless skipped), then know-code ask / quiz, then retry.",
+        "know-code: flow: range begin → taught → ask → grade → pass → know-code commit",
       );
       process.exit(2);
     }
@@ -27,7 +32,6 @@ export function cmdCommit(rawArgs: string[]): void {
 
   const noTrailer = rawArgs.includes("--no-trailer");
   const gitArgs = rawArgs.filter((a) => a !== "--no-trailer");
-  // Always add trailer unless explicitly opted out (CI / dogfooding default).
   const withTrailer = !noTrailer;
 
   let finalArgs = [...gitArgs];
@@ -70,18 +74,12 @@ function injectTrailer(args: string[], hash: string): string[] {
         continue;
       }
     }
-    // Combined -mMessage form is rare; skip
     out.push(a);
   }
 
   if (!injected) {
-    // No -m provided: use a commit template via -m with only trailer is wrong.
-    // Require -m so the agent always passes an explicit message.
     console.error(
-      "know-code: pass a message with -m \"...\" (trailer is added automatically).",
-    );
-    console.error(
-      'know-code: example: know-code commit -m "Fix the gate hash floor"',
+      'know-code: pass a message with -m "..." (trailer is added automatically).',
     );
     process.exit(1);
   }

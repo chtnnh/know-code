@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
-import { currentHead, git, mergeBase, resolveBaseRef } from "./git.js";
-import type { Config, DiffContext } from "./types.js";
+import { readConfig } from "./config.js";
+import {
+  currentHead,
+  git,
+  mergeBase,
+  resolveBaseRef,
+  revListCount,
+} from "./git.js";
+import { findGitRoot } from "./paths.js";
+import { readRangeSession } from "./range.js";
+import type { Config, DiffContext, QuizContext } from "./types.js";
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
@@ -10,9 +19,6 @@ export function sha256(input: string): string {
 
 /**
  * Hash is the patch from the empty tree to the **index** (HEAD + staged).
- * A fixed floor (not merge-base) keeps the hash stable when origin/main
- * catches up to HEAD and when quiz-then-commit lands the same tree.
- * Message-only amends do not change the tree, so they keep the same hash.
  */
 export function computeDiffContext(
   repoRoot: string,
@@ -21,7 +27,6 @@ export function computeDiffContext(
   const baseRef = resolveBaseRef(repoRoot, config.baseBranch);
   const headRef = currentHead(repoRoot);
 
-  // Display range only — not part of the hash material
   let rangeFrom = EMPTY_TREE;
   if (headRef !== EMPTY_TREE) {
     const mb = mergeBase(repoRoot, baseRef, headRef);
@@ -37,13 +42,81 @@ export function computeDiffContext(
     allowFail: true,
   });
 
-  const material = [`diff:${diff}`].join("\n");
-
   return {
     baseRef,
     headRef: headRef === EMPTY_TREE ? EMPTY_TREE : headRef,
     commitRange: `${rangeFrom}..${headRef === EMPTY_TREE ? "HEAD" : headRef}`,
     diff,
-    diffHash: sha256(material),
+    diffHash: sha256(`diff:${diff}`),
   };
+}
+
+/** Cumulative hash for fromOid..HEAD plus staged changes. */
+export function computeRangeDiffContext(
+  repoRoot: string,
+  config: Config,
+  fromOid: string,
+): QuizContext {
+  const baseRef = resolveBaseRef(repoRoot, config.baseBranch);
+  const headRef = currentHead(repoRoot);
+  const headLabel = headRef === EMPTY_TREE ? "HEAD" : headRef;
+  const commitCount = revListCount(repoRoot, fromOid, headLabel);
+
+  const rangeDiff = git(["diff", `${fromOid}...HEAD`], repoRoot, {
+    allowFail: true,
+  });
+  const staged = git(["diff", "--cached"], repoRoot, { allowFail: true });
+  const material = staged.trim()
+    ? `diff:${rangeDiff}\nstaged:${staged}`
+    : `diff:${rangeDiff}`;
+
+  return {
+    baseRef,
+    headRef: headRef === EMPTY_TREE ? EMPTY_TREE : headRef,
+    commitRange: `${fromOid}..${headLabel}`,
+    diff: staged.trim() ? `${rangeDiff}\n---staged---\n${staged}` : rangeDiff,
+    diffHash: sha256(material),
+    scope: "range",
+    rangeFromOid: fromOid,
+    commitCount,
+  };
+}
+
+export function resolveRangeFromOid(
+  repoRoot: string,
+  config: Config,
+): string {
+  const session = readRangeSession(repoRoot);
+  if (session) return session.fromOid;
+  const baseRef = resolveBaseRef(repoRoot, config.baseBranch);
+  const head = currentHead(repoRoot);
+  if (head === EMPTY_TREE) return EMPTY_TREE;
+  return mergeBase(repoRoot, baseRef, head);
+}
+
+/**
+ * Pick index vs range hash based on rangeMode and active range session.
+ */
+export function resolveQuizContext(
+  repoRoot: string,
+  config?: Config,
+): QuizContext {
+  const cfg = config ?? readConfig(repoRoot);
+  const mode = cfg.rangeMode;
+  const session = readRangeSession(repoRoot);
+
+  const useRange = mode === "range" || (mode === "auto" && session !== null);
+
+  if (!useRange) {
+    const ctx = computeDiffContext(repoRoot, cfg);
+    return { ...ctx, scope: "index", commitCount: 0 };
+  }
+
+  const fromOid = resolveRangeFromOid(repoRoot, cfg);
+  return computeRangeDiffContext(repoRoot, cfg, fromOid);
+}
+
+export function resolveQuizContextFromRoot(): QuizContext {
+  const repoRoot = findGitRoot();
+  return resolveQuizContext(repoRoot);
 }
