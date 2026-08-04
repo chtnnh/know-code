@@ -57,11 +57,12 @@ See [grading docs](https://kc.chtnnhfoundation.org/docs/grading) and [tutorial](
 
 ## Author
 
-**CHTNNH Foundation** — [chtnnhfoundation.org](https://chtnnnhfoundation.org)
+Built by **[chtnnh](https://github.com/chtnnh)**.
 
-- CLI: [@chtnnh/know-code](https://www.npmjs.com/package/@chtnnh/know-code)
-- Source: [github.com/chtnnh/know-code](https://github.com/chtnnh/know-code)
-- Docs: [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org)
+- **Repository:** [github.com/chtnnh/know-code](https://github.com/chtnnh/know-code)
+- **npm:** [@chtnnh/know-code](https://www.npmjs.com/package/@chtnnh/know-code)
+- **Documentation:** [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org)
+- **Issues:** [github.com/chtnnh/know-code/issues](https://github.com/chtnnh/know-code/issues)
 
 ## Development
 

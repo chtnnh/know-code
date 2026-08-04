@@ -5,7 +5,7 @@ import {
   computeRangeDiffContext,
 } from "./hash.js";
 import { readRangeSeal } from "./range.js";
-import { inferUniformRangeTrailerHash } from "./trailers.js";
+import { inferUniformRangeTrailerHash, trailerHashFromMessage } from "./trailers.js";
 import type { Config } from "./types.js";
 
 export interface VerifyHashCandidate {
@@ -86,6 +86,12 @@ export function collectVerifyHashCandidates(
 
   const seal = readRangeSeal(repoRoot);
   if (seal?.diffHash) add(seal.diffHash, "range-seal");
+
+  const headMsg = git(["log", "-1", "--format=%B", headRef], repoRoot, {
+    allowFail: true,
+  });
+  const headTrailer = trailerHashFromMessage(headMsg);
+  if (headTrailer) add(headTrailer, "head-trailer");
 
   return candidates;
 }
