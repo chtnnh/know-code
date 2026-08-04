@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { readConfig, resolveLevel } from "../config.js";
-import { writeAnswers } from "../attest.js";
+import { writeAnswers, assertTaughtForHash } from "../attest.js";
 import { resolveQuizContext } from "../hash.js";
 import {
   collectQuotaSignals,
@@ -171,6 +171,7 @@ function renderPage(quiz: QuizSpec): string {
     <p class="meta">
       Level <strong>${escapeHtml(quiz.level)}</strong>
       · hash <code>${escapeHtml(quiz.diffHash.slice(0, 12))}…</code>
+      · Question <span id="progress">1</span> of ${quiz.questions.length}
       · answers stay in this form (not the agent chat)
     </p>
     <form id="quiz">
@@ -183,6 +184,27 @@ function renderPage(quiz: QuizSpec): string {
     const form = document.getElementById("quiz");
     const done = document.getElementById("done");
     const btn = document.getElementById("submit");
+    const progress = document.getElementById("progress");
+    const storageKey = "know-code-quiz-" + ${JSON.stringify(quiz.diffHash)};
+    try {
+      const draft = localStorage.getItem(storageKey);
+      if (draft) {
+        const saved = JSON.parse(draft);
+        for (const [id, val] of Object.entries(saved)) {
+          const el = document.getElementById(id);
+          if (el) el.value = val;
+        }
+      }
+    } catch (_) {}
+    form.querySelectorAll("textarea").forEach((ta) => {
+      ta.addEventListener("input", () => {
+        const data = {};
+        form.querySelectorAll("textarea").forEach((t) => { data[t.id] = t.value; });
+        try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch (_) {}
+        const filled = [...form.querySelectorAll("textarea")].filter((t) => t.value.trim()).length;
+        if (progress) progress.textContent = String(Math.max(1, filled));
+      });
+    });
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       btn.disabled = true;
@@ -198,9 +220,15 @@ function renderPage(quiz: QuizSpec): string {
       });
       if (!res.ok) {
         btn.disabled = false;
-        alert("Submit failed — try again.");
+        let msg = "Submit failed";
+        try {
+          const err = await res.json();
+          if (err.error) msg = err.error;
+        } catch (_) {}
+        alert(msg);
         return;
       }
+      try { localStorage.removeItem(storageKey); } catch (_) {}
       form.style.opacity = "0.45";
       form.querySelectorAll("textarea,button").forEach((el) => { el.disabled = true; });
       done.classList.add("show");
@@ -258,6 +286,15 @@ export async function cmdAsk(opts: {
   }
   const fromRef = resolveQuotaFrom(repoRoot, config.baseBranch, ctx.rangeFromOid);
   const level = resolveLevel(repoRoot, quiz.level);
+  if (config.enforcePipeline) {
+    try {
+      assertTaughtForHash(repoRoot, ctx.diffHash);
+    } catch (err) {
+      throw new Error(
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
   const quota = computeQuestionQuota(
     collectQuotaSignals(repoRoot, level, fromRef),
   );
@@ -307,9 +344,17 @@ export async function cmdAsk(opts: {
     }, Math.max(1, timeoutSec) * 1000);
     timer.unref?.();
 
-    server.on("error", (err) => {
+    server.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      reject(err);
+      if (err.code === "EADDRINUSE") {
+        reject(
+          new Error(
+            `Port ${port} in use — try: know-code ask --port <other>`,
+          ),
+        );
+      } else {
+        reject(err);
+      }
     });
     server.listen(port, "127.0.0.1", () => {
       const url = `http://127.0.0.1:${port}/`;
@@ -343,6 +388,15 @@ async function handle(
   if (req.method === "POST" && url === "/submit") {
     const body = JSON.parse(await readBody(req)) as { answers?: QuizAnswer[] };
     const answers = body.answers || [];
+    const requiredIds = new Set(quiz.questions.map((q) => q.id));
+    const answeredIds = new Set(answers.map((a) => a.id));
+    for (const id of requiredIds) {
+      if (!answeredIds.has(id)) {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: `missing answer for ${id}` }));
+        return;
+      }
+    }
     if (!answers.length) {
       res.writeHead(400, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "no answers" }));

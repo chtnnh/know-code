@@ -4,6 +4,7 @@
  */
 import { readConfig } from "./config.js";
 import { git, mergeBase, resolveBaseRef, revListCount } from "./git.js";
+import { resolveQuizContext } from "./hash.js";
 import { findGitRoot } from "./paths.js";
 import { readRangeSession } from "./range.js";
 import { isLevel, type Level } from "./types.js";
@@ -230,6 +231,7 @@ export function computeQuestionQuota(signals: QuotaSignals): QuotaResult {
 
 export function cmdQuestions(opts: {
   json?: boolean;
+  template?: boolean;
   from?: string;
   level?: string;
 }): void {
@@ -247,6 +249,21 @@ export function cmdQuestions(opts: {
   const fromRef = resolveQuotaFrom(repoRoot, config.baseBranch, opts.from);
   const signals = collectQuotaSignals(repoRoot, level, fromRef);
   const result = computeQuestionQuota(signals);
+
+  if (opts.template) {
+    const ctx = resolveQuizContext(repoRoot, config);
+    const template = {
+      diffHash: ctx.diffHash,
+      level,
+      title: "know-code quiz",
+      questions: Array.from({ length: result.minQuestions }, (_, i) => ({
+        id: `q${i + 1}`,
+        prompt: "…",
+      })),
+    };
+    console.log(JSON.stringify(template, null, 2));
+    return;
+  }
 
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));
