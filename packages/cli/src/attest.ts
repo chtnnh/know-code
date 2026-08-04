@@ -38,6 +38,9 @@ export interface GradeReceipt {
   gradedAt: string;
   level?: Level;
   answersDigest: string;
+  proposalDigest?: string;
+  humanAdjusted?: boolean;
+  finalScore?: number;
   keyId?: string;
   sig?: string;
 }
@@ -70,7 +73,9 @@ export function readAnswers(repoRoot: string): AnswersFile | null {
   try {
     return JSON.parse(readFileSync(path, "utf8")) as AnswersFile;
   } catch {
-    return null;
+    throw new Error(
+      "know-code: corrupt .know-code/answers.json — delete and re-run know-code ask.",
+    );
   }
 }
 
@@ -89,7 +94,9 @@ export function readGrade(repoRoot: string): GradeReceipt | null {
     if (data.version !== 1 || typeof data.score !== "number") return null;
     return data;
   } catch {
-    return null;
+    throw new Error(
+      "know-code: corrupt .know-code/grade.json — delete and re-run know-code grade --review.",
+    );
   }
 }
 
@@ -106,7 +113,9 @@ export function readTaught(repoRoot: string): TaughtReceipt | null {
     if (data.version !== 1 || !data.diffHash) return null;
     return data;
   } catch {
-    return null;
+    throw new Error(
+      "know-code: corrupt .know-code/taught.json — delete and re-run know-code taught.",
+    );
   }
 }
 
@@ -157,8 +166,8 @@ export function assertGradeForHash(
   const grade = readGrade(repoRoot);
   if (!grade) {
     throw new Error(
-      "know-code: missing .know-code/grade.json — after grading answers, a human must run:\n" +
-        `  know-code grade --score <0-1> --hash ${diffHash}`,
+      "know-code: missing .know-code/grade.json — after agent grading, a human must run:\n" +
+        `  know-code grade --review --hash ${diffHash}`,
     );
   }
   if (grade.diffHash !== diffHash) {

@@ -1,10 +1,10 @@
+import { readConfig, resolveLevel } from "../config.js";
 import {
   assertAnswersForHash,
   assertGradeAnswersBinding,
   assertGradeForHash,
   assertTaughtForHash,
 } from "../attest.js";
-import { readConfig, resolveLevel } from "../config.js";
 import { writeGate } from "../gate.js";
 import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
@@ -23,15 +23,9 @@ export async function cmdPass(opts: {
   const config = readConfig(repoRoot);
   const ctx = resolveQuizContext(repoRoot, config);
   const level = resolveLevel(repoRoot, opts.level);
+  const hash = opts.hash || ctx.diffHash;
 
-  if (!opts.hash) {
-    console.error(
-      "know-code: pass requires --hash <diffHash> (bind the gate to the quizzed diff).",
-    );
-    process.exit(1);
-  }
-
-  if (opts.hash !== ctx.diffHash) {
+  if (hash !== ctx.diffHash) {
     console.error(
       `know-code: provided hash does not match current diff.\n` +
         `  provided: ${opts.hash}\n` +
@@ -54,6 +48,11 @@ export async function cmdPass(opts: {
     answers = assertAnswersForHash(repoRoot, ctx.diffHash);
     grade = assertGradeForHash(repoRoot, ctx.diffHash);
     assertGradeAnswersBinding(grade, answers);
+    if (grade.level && grade.level !== level) {
+      console.error(
+        `know-code: warning — grade level (${grade.level}) differs from pass level (${level})`,
+      );
+    }
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
