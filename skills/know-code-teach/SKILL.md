@@ -9,7 +9,7 @@ description: >-
 compatibility: "works in any agentskills.io harness"
 metadata:
   author: chtnnh
-  version: "0.1.4"
+  version: "0.2.0"
 license: MIT
 ---
 
@@ -49,7 +49,9 @@ While coding, keep explanations **incremental**: after meaningful chunks, narrat
 | `know-code-teach` | Build understanding **before/during** work |
 | `know-code` | Verify understanding before commit/push/PR |
 
-**Required order:** `range begin` → teach → human seals `know-code taught` → edit → (teach deltas) → `questions` → quiz → human seals grade/pass → `know-code commit` → `range seal` / push.
+**Required order:** `range begin` → teach → human seals `know-code taught` → edit → (teach deltas) → `questions` → quiz → ask → agent `grade-proposal.json` → human `grade --review` → `pass` → `know-code commit` → `range seal` / push.
+
+Re-seal **`know-code taught`** when the diff hash changes (`know-code hash`).
 
 After teaching (or an explicit human skip), the **human** seals the artifact (passphrase; agents cannot forge):
 

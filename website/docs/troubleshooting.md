@@ -18,12 +18,74 @@ know-code range begin              # if multi-commit batch
 know-code taught                   # or taught --skip
 know-code questions --json         # agent writes quiz.json
 know-code ask --quiz .know-code/quiz.json
-know-code grade --score 0.85 --hash "$(know-code hash)"
-know-code pass --level standard --hash "$(know-code hash)"
+know-code grade --review
+know-code pass
 know-code commit -m "your message"
 ```
 
-If `check` says the seal is invalid, an agent may have written unsigned JSON — re-run the human seal commands.
+Use `know-code status` and `know-code doctor` to see the next step.
+
+## Quiz hash mismatch
+
+```text
+Quiz diffHash does not match current … hash
+```
+
+Re-run `know-code questions --template`, rewrite `.know-code/quiz.json` for the current hash (`know-code hash`).
+
+## Too few quiz questions
+
+```text
+Quiz has N questions but need at least M
+```
+
+Run `know-code questions --json` and add questions until `minQuestions` is met. Validate with `know-code quiz validate`.
+
+## `range already active`
+
+Finish with `know-code range seal` or clear with `know-code range abort` (`--keep-seal` to retain range-seal.json).
+
+## Grade below 0.8 (exit 2)
+
+Re-teach weak areas, update quiz, re-run `ask`, agent re-proposes grade, human `grade --review` again.
+
+## `requireTrailer` local vs CI mismatch
+
+Local `init` defaults `requireTrailer: false`; the GitHub Action writes `true` if config is missing. Align:
+
+```bash
+know-code config set requireTrailer true
+```
+
+Or use `know-code init --workflow` (sets `requireTrailer` when adding CI).
+
+## Port in use (`ask`)
+
+```text
+Port 3847 in use — try: know-code ask --port <other>
+```
+
+## Skills install failure
+
+If `npx skills add` fails, install manually from [skills.md](/skills) or clone the repo skills into your agent skills directory.
+
+## Stale seals after rebase / pull
+
+Hash changes invalidate receipts. Run `know-code status --json` to see blockers. Re-run the pipeline from `taught` or `know-code reset` to clear artifacts.
+
+## Wrong attest passphrase
+
+```text
+wrong attest passphrase
+```
+
+Use the passphrase from `attest-init`. Rotate with `attest-init --force` (invalidates old seals).
+
+## `status --json` debugging
+
+```bash
+know-code status --json | jq '.nextStep, .blockers'
+```
 
 ## `know-code commit` says pass `-m "..."`
 

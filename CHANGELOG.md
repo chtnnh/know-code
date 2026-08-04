@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.2.0
+
+### Agent-proposed grading (flagship)
+- **`grade-proposal.json`** — agent scores answers after `ask`; human reviews with **`know-code grade --review`**
+- **`know-code grade propose --json`** — rubric context for agents
+- Sealed **`grade.json`** binds `proposalDigest`, `humanAdjusted`, `finalScore`
+- **`allowSelfScore`** config (default false); deprecates honor-system `grade --score`
+- Skill reference: `grading-rubric.md`
+
+### Guided UX
+- **`know-code doctor`** — attest, hooks, pipeline, port checks
+- **`status --next`** — `nextStep` + `blockers[]` in status output
+- **`know-code ship`** — checklist before push
+- **`know-code range continue --yes`** — start new range after seal (prompt, not silent auto)
+
+### CLI robustness
+- **`know-code quiz validate`** · **`questions --template`**
+- **`config set <key> <value>`** · expanded **`init`** flags
+- **`commit -F`** / **`--message`** · **`know-code amend`**
+- **`know-code reset`** · **`range abort --keep-seal`**
+- **`hooks uninstall`** · hidden passphrase input
+- **`verify --range-seal`** · **`requireTrailer`** wired in check
+- Better deny messages with suggested next command
+- Corrupt JSON errors for gate/taught/grade/answers
+
+### Docs
+- New: quiz, grading, workflows, hooks, team, tutorial pages
+- Expanded troubleshooting
+
+### CI / action
+- Action input **`require-range-trailers`**
+- Docs build in main CI
+- `action/README.md` · `scripts/bump-release-pins.mjs`
+
 ## 0.1.4
 
 ### Range workflow (less cumbersome)
