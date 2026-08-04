@@ -1,23 +1,31 @@
 import { readConfig } from "../config.js";
 import { isSignedGateOpen, readGate } from "../gate.js";
 import { resolveQuizContext } from "../hash.js";
+import { CANONICAL_FLOW } from "../grading.js";
+import { formatCheckDeny } from "../pipeline.js";
 import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
 import { isSealedRewriteRangeOpen, readRangeSeal } from "../range.js";
+import { headHasTrailer } from "../verify-helpers.js";
 
-export function cmdCheck(): never {
-  const repoRoot = findGitRoot();
+export interface CheckResult {
+  allowed: boolean;
+  reason?: string;
+  next?: string;
+  viaOverride?: boolean;
+}
 
+export function runCheck(repoRoot: string): CheckResult {
   if (process.env.KNOW_CODE_OVERRIDE === "1") {
     const bypass = tryOverrideBypass(repoRoot);
     if (bypass.allowed) {
-      console.error(
-        "know-code: KNOW_CODE_OVERRIDE=1 — check passed via human override (logged).",
-      );
-      process.exit(0);
+      return { allowed: true, viaOverride: true };
     }
-    console.error(bypass.reason || "know-code: OVERRIDE denied.");
-    process.exit(2);
+    return {
+      allowed: false,
+      reason: bypass.reason || "OVERRIDE denied",
+      next: "know-code override",
+    };
   }
 
   const config = readConfig(repoRoot);
@@ -25,35 +33,57 @@ export function cmdCheck(): never {
   const receipt = readGate(repoRoot);
 
   if (isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
-    console.error(
-      `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
-    );
-    process.exit(0);
+    if (config.requireTrailer && !headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash)) {
+      return {
+        allowed: false,
+        reason: "requireTrailer: HEAD missing Know-Code-Verified trailer",
+        next: "know-code commit -m \"…\"",
+      };
+    }
+    return { allowed: true };
   }
 
   if (isSealedRewriteRangeOpen(repoRoot)) {
-    const seal = readRangeSeal(repoRoot)!;
-    console.error(
-      `know-code: gate open (sealed rewrite range) for ${seal.diffHash.slice(0, 12)}…`,
-    );
+    return { allowed: true };
+  }
+
+  const { reason, next } = formatCheckDeny(repoRoot, config, ctx, receipt);
+  return { allowed: false, reason, next };
+}
+
+export function cmdCheck(): never {
+  const repoRoot = findGitRoot();
+  const config = readConfig(repoRoot);
+  const ctx = resolveQuizContext(repoRoot, config);
+  const result = runCheck(repoRoot);
+
+  if (result.allowed) {
+    if (result.viaOverride) {
+      console.error(
+        "know-code: KNOW_CODE_OVERRIDE=1 — check passed via human override (logged).",
+      );
+    } else if (isSealedRewriteRangeOpen(repoRoot)) {
+      const seal = readRangeSeal(repoRoot)!;
+      console.error(
+        `know-code: gate open (sealed rewrite range) for ${seal.diffHash.slice(0, 12)}…`,
+      );
+    } else {
+      const receipt = readGate(repoRoot);
+      console.error(
+        `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
+      );
+    }
     process.exit(0);
   }
 
-  const reason = !receipt
-    ? "no sealed quiz receipt"
-    : receipt.diffHash !== ctx.diffHash
-      ? "diff changed since last quiz"
-      : config.requireAttest && !receipt.sig
-        ? "gate.json missing human seal (forged or pre-attest)"
-        : `receipt level "${receipt.level}" is below required "${config.level}" or seal invalid`;
-
-  console.error(`know-code: commit/push blocked — ${reason}.`);
+  console.error(`know-code: commit/push blocked — ${result.reason}.`);
   console.error(
     `know-code: current hash ${ctx.diffHash} (scope: ${ctx.scope}, level: ${config.level}).`,
   );
-  console.error(
-    "know-code: flow: range begin → taught → questions → ask → grade → pass → range seal",
-  );
+  if (result.next) {
+    console.error(`know-code: next: ${result.next}`);
+  }
+  console.error(`know-code: flow: ${CANONICAL_FLOW}`);
   console.error(
     "know-code: emergency (human TTY): know-code override && KNOW_CODE_OVERRIDE=1 …",
   );
