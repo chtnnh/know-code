@@ -25,6 +25,12 @@ export interface Config {
   rangeMode: RangeMode;
   rangeSeal: RangeSealMode;
   requireAttest: boolean;
+  /** Require agent grade-proposal.json before human grade seal. */
+  requireGradeProposal?: boolean;
+  /** Allow legacy grade --score without proposal. */
+  allowSelfScore?: boolean;
+  /** Require sealed taught before ask. */
+  enforcePipeline?: boolean;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -34,6 +40,9 @@ export const DEFAULT_CONFIG: Config = {
   rangeMode: "auto",
   rangeSeal: "receipt",
   requireAttest: true,
+  requireGradeProposal: true,
+  allowSelfScore: false,
+  enforcePipeline: false,
 };
 
 export interface GateReceipt {

@@ -56,7 +56,57 @@ export function readConfig(repoRoot: string): Config {
     rangeMode: rangeModeRaw,
     rangeSeal: rangeSealRaw,
     requireAttest: merged.requireAttest ?? DEFAULT_CONFIG.requireAttest,
+    requireGradeProposal:
+      merged.requireGradeProposal ?? DEFAULT_CONFIG.requireGradeProposal,
+    allowSelfScore: merged.allowSelfScore ?? DEFAULT_CONFIG.allowSelfScore,
+    enforcePipeline: merged.enforcePipeline ?? DEFAULT_CONFIG.enforcePipeline,
   };
+}
+
+export function setConfigValue(
+  repoRoot: string,
+  key: string,
+  value: string,
+): void {
+  const config = readConfig(repoRoot);
+  switch (key) {
+    case "level":
+      if (!isLevel(value)) throw new Error(`Invalid level "${value}"`);
+      config.level = value;
+      break;
+    case "baseBranch":
+      config.baseBranch = value;
+      break;
+    case "requireTrailer":
+      config.requireTrailer = value === "true";
+      break;
+    case "rangeMode":
+      if (!isRangeMode(value)) throw new Error(`Invalid rangeMode "${value}"`);
+      config.rangeMode = value;
+      break;
+    case "rangeSeal":
+      if (!isRangeSealMode(value))
+        throw new Error(`Invalid rangeSeal "${value}"`);
+      config.rangeSeal = value;
+      break;
+    case "requireAttest":
+      config.requireAttest = value === "true";
+      break;
+    case "requireGradeProposal":
+      config.requireGradeProposal = value === "true";
+      break;
+    case "allowSelfScore":
+      config.allowSelfScore = value === "true";
+      break;
+    case "enforcePipeline":
+      config.enforcePipeline = value === "true";
+      break;
+    default:
+      throw new Error(
+        `Unknown config key "${key}". Keys: level, baseBranch, requireTrailer, rangeMode, rangeSeal, requireAttest, requireGradeProposal, allowSelfScore, enforcePipeline`,
+      );
+  }
+  writeConfig(repoRoot, config);
 }
 
 /** Repo-local settings only — gitignored; never includes attest keys. */

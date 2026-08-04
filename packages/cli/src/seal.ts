@@ -37,6 +37,7 @@ import { createInterface } from "node:readline";
 import { stdin as input, stderr as output } from "node:process";
 import { findGitRoot } from "./paths.js";
 import { readConfig } from "./config.js";
+import { promptSecretHidden } from "./prompt.js";
 
 export const ATTEST_VERSION = 1 as const;
 
@@ -110,17 +111,7 @@ export function canUsePassphraseEnv(): boolean {
 }
 
 function promptSecret(question: string): Promise<string> {
-  const rl = createInterface({ input, output, terminal: true });
-  return new Promise((resolve) => {
-    // readline cannot hide input portably without raw mode; warn clearly.
-    output.write(
-      "know-code: passphrase will echo — prefer an external terminal, not an agent-mediated shell.\n",
-    );
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
+  return promptSecretHidden(question);
 }
 
 export async function resolvePassphrase(opts?: {

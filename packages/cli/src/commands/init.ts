@@ -8,10 +8,10 @@ import {
   type AgentId,
 } from "../hooks.js";
 import { findGitRoot, knowCodeDir } from "../paths.js";
-import { DEFAULT_CONFIG, isLevel, type Config } from "../types.js";
+import { DEFAULT_CONFIG, isLevel, isRangeMode, isRangeSealMode, type Config } from "../types.js";
 
 const DOCS = "https://kc.chtnnhfoundation.org";
-const ACTION_REF = "chtnnh/know-code/action@v0.1.4";
+const ACTION_REF = "chtnnh/know-code/action@v0.2.0";
 
 export function consumerWorkflowYaml(baseBranch: string): string {
   return `name: know-code
@@ -41,6 +41,10 @@ export function cmdInit(opts: {
   agents?: string;
   requireTrailer?: boolean;
   workflow?: boolean;
+  rangeMode?: string;
+  rangeSeal?: string;
+  requireAttest?: boolean;
+  requireGradeProposal?: boolean;
 }): void {
   const repoRoot = findGitRoot();
 
@@ -63,6 +67,29 @@ export function cmdInit(opts: {
   if (opts.baseBranch) config.baseBranch = opts.baseBranch;
   if (opts.requireTrailer !== undefined) {
     config.requireTrailer = opts.requireTrailer;
+  }
+  if (opts.workflow) {
+    config.requireTrailer = true;
+  }
+  if (opts.rangeMode) {
+    if (!isRangeMode(opts.rangeMode)) {
+      console.error(`Invalid rangeMode: ${opts.rangeMode}`);
+      process.exit(1);
+    }
+    config.rangeMode = opts.rangeMode;
+  }
+  if (opts.rangeSeal) {
+    if (!isRangeSealMode(opts.rangeSeal)) {
+      console.error(`Invalid rangeSeal: ${opts.rangeSeal}`);
+      process.exit(1);
+    }
+    config.rangeSeal = opts.rangeSeal;
+  }
+  if (opts.requireAttest !== undefined) {
+    config.requireAttest = opts.requireAttest;
+  }
+  if (opts.requireGradeProposal !== undefined) {
+    config.requireGradeProposal = opts.requireGradeProposal;
   }
 
   writeConfig(repoRoot, config);
@@ -126,7 +153,7 @@ export function cmdInit(opts: {
   console.log("       know-code skills              # this repo only");
   console.log("       know-code skills --global     # all repos (Cursor/Claude/Codex/…)");
   console.log("  3. know-code attest-init && know-code range begin");
-  console.log("  4. taught → questions → ask → grade → pass → range seal");
+  console.log("  4. taught → questions → ask → grade propose → grade --review → pass → range seal");
   console.log(`Docs: ${DOCS}`);
 }
 

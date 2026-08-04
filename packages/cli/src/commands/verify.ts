@@ -4,6 +4,8 @@ import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
 import { readRangeSeal } from "../range.js";
 import { rangeHasTipTrailers } from "../trailers.js";
+import { assertSigned } from "../seal.js";
+import { headHasTrailer } from "../verify-helpers.js";
 
 function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   const commits = git(["rev-list", "--reverse", `${from}..${to}`], repoRoot, {
@@ -23,20 +25,43 @@ function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   return found;
 }
 
-function headHasTrailer(repoRoot: string, headRef: string, hash: string): boolean {
-  const headMsg = git(["log", "-1", "--format=%B", headRef], repoRoot, {
-    allowFail: true,
-  });
-  return new RegExp(`^Know-Code-Verified:\\s*${hash}\\s*$`, "im").test(headMsg);
+function headHasTrailerLocal(repoRoot: string, headRef: string, hash: string): boolean {
+  return headHasTrailer(repoRoot, headRef, hash);
 }
 
 export function cmdVerify(opts: {
   requireAll?: boolean;
   requireRangeTrailers?: boolean;
+  rangeSeal?: boolean;
 }): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const ctx = resolveQuizContext(repoRoot, config);
+
+  if (opts.rangeSeal) {
+    const seal = readRangeSeal(repoRoot);
+    if (!seal) {
+      console.error("know-code: no range-seal.json");
+      process.exit(1);
+    }
+    try {
+      assertSigned(
+        repoRoot,
+        "range-seal.json",
+        seal as unknown as Record<string, unknown> & {
+          sig?: string;
+          keyId?: string;
+        },
+      );
+      console.log(
+        `know-code: range seal valid (${seal.sealMode}, hash ${seal.diffHash.slice(0, 12)}…)`,
+      );
+      process.exit(0);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  }
 
   console.log(`know-code verify`);
   console.log(`  expected: ${ctx.diffHash}`);
@@ -66,7 +91,7 @@ export function cmdVerify(opts: {
     process.exit(1);
   }
 
-  if (headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash)) {
+  if (headHasTrailerLocal(repoRoot, ctx.headRef, ctx.diffHash)) {
     console.log("know-code: HEAD trailer verified");
     process.exit(0);
   }
@@ -89,6 +114,10 @@ export function cmdVerify(opts: {
 
   if (opts.requireAll) {
     console.error("know-code: require-all: missing matching trailers");
+  }
+
+  if (!config.requireTrailer) {
+    console.error("know-code: requireTrailer is false — verify is optional locally");
   }
 
   console.error("know-code: no matching Know-Code-Verified trailer");

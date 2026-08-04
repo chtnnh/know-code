@@ -1,6 +1,6 @@
 {
   "name": "@chtnnh/know-code",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Gate git push / PR creation until the human passes a comprehension quiz about the diff",
   "type": "module",
   "bin": {
@@ -41,7 +41,7 @@
   "bugs": {
     "url": "https://github.com/chtnnh/know-code/issues"
   },
-  "homepage": "https://github.com/chtnnh/know-code#readme",
+  "homepage": "https://kc.chtnnhfoundation.org",
   "devDependencies": {
     "@types/node": "^22.13.10",
     "typescript": "^5.8.2"

@@ -12,7 +12,9 @@ export function readGate(repoRoot: string): GateReceipt | null {
     if (data.version !== 1 || !data.diffHash || !data.level) return null;
     return data;
   } catch {
-    return null;
+    throw new Error(
+      "know-code: corrupt .know-code/gate.json — delete and re-run know-code pass.",
+    );
   }
 }
 

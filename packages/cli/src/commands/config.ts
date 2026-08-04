@@ -1,4 +1,4 @@
-import { readConfig } from "../config.js";
+import { readConfig, setConfigValue, writeConfig } from "../config.js";
 import { resolveQuizContext } from "../hash.js";
 import {
   findGitRoot,
@@ -47,6 +47,8 @@ export function cmdConfig(json = false): void {
   console.log(`  rangeSeal:     ${config.rangeSeal}`);
   console.log(`  requireAttest: ${config.requireAttest}`);
   console.log(`  requireTrailer:${config.requireTrailer}`);
+  console.log(`  requireGradeProposal: ${config.requireGradeProposal ?? true}`);
+  console.log(`  allowSelfScore: ${config.allowSelfScore ?? false}`);
   console.log(`  quiz scope:    ${ctx.scope}`);
   console.log(`  quiz hash:     ${ctx.diffHash.slice(0, 16)}…`);
   console.log(`  attest ready:  ${payload.attest.ready}`);
@@ -54,4 +56,10 @@ export function cmdConfig(json = false): void {
     console.log(`  range active:  from ${session.fromOid.slice(0, 12)}…`);
   }
   console.log(`  home config:   ${homeConfigPath()}`);
+}
+
+export function cmdConfigSet(key: string, value: string): void {
+  const repoRoot = findGitRoot();
+  setConfigValue(repoRoot, key, value);
+  console.log(`know-code: config set ${key}=${value}`);
 }

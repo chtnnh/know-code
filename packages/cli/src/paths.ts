@@ -42,6 +42,14 @@ export function gradePath(repoRoot: string): string {
   return join(knowCodeDir(repoRoot), "grade.json");
 }
 
+export function gradeProposalPath(repoRoot: string): string {
+  return join(knowCodeDir(repoRoot), "grade-proposal.json");
+}
+
+export function quizPath(repoRoot: string): string {
+  return join(knowCodeDir(repoRoot), "quiz.json");
+}
+
 export function taughtPath(repoRoot: string): string {
   return join(knowCodeDir(repoRoot), "taught.json");
 }
