@@ -90,7 +90,9 @@ function parseArgs(argv: string[]): {
 } {
   const [command = "help", sub0, sub1, ...rest0] = argv;
   if (command === "commit" || command === "amend") {
-    const all = sub0 ? [sub0, ...rest0] : rest0;
+    const all = sub0
+      ? [sub0, sub1, ...rest0].filter((x): x is string => !!x)
+      : rest0;
     return { command, flags: {}, rest: all };
   }
   if (command === "range" || command === "grade" || command === "hooks" || command === "quiz") {

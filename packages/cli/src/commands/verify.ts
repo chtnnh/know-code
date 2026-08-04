@@ -3,9 +3,17 @@ import { git, mergeBase } from "../git.js";
 import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
 import { readRangeSeal } from "../range.js";
-import { rangeHasTipTrailers } from "../trailers.js";
+import {
+  inferUniformRangeTrailerHash,
+  rangeHasTipTrailers,
+} from "../trailers.js";
 import { assertSigned } from "../seal.js";
-import { headHasTrailer } from "../verify-helpers.js";
+import {
+  collectVerifyHashCandidates,
+  headHasTrailer,
+  matchHeadTrailer,
+  primaryVerifyCandidate,
+} from "../verify-helpers.js";
 
 function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   const commits = git(["rev-list", "--reverse", `${from}..${to}`], repoRoot, {
@@ -25,10 +33,6 @@ function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   return found;
 }
 
-function headHasTrailerLocal(repoRoot: string, headRef: string, hash: string): boolean {
-  return headHasTrailer(repoRoot, headRef, hash);
-}
-
 export function cmdVerify(opts: {
   requireAll?: boolean;
   requireRangeTrailers?: boolean;
@@ -37,6 +41,8 @@ export function cmdVerify(opts: {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const ctx = resolveQuizContext(repoRoot, config);
+  const candidates = collectVerifyHashCandidates(repoRoot, config);
+  const primary = primaryVerifyCandidate(candidates);
 
   if (opts.rangeSeal) {
     const seal = readRangeSeal(repoRoot);
@@ -64,7 +70,7 @@ export function cmdVerify(opts: {
   }
 
   console.log(`know-code verify`);
-  console.log(`  expected: ${ctx.diffHash}`);
+  console.log(`  expected: ${primary.hash} (${primary.label})`);
   console.log(`  scope:    ${ctx.scope}`);
   console.log(`  range:    ${ctx.commitRange}`);
 
@@ -74,7 +80,11 @@ export function cmdVerify(opts: {
   if (opts.requireRangeTrailers) {
     const seal = readRangeSeal(repoRoot);
     const trailerFrom = seal?.rangeFromOid ?? (ctx.scope === "range" ? fromOid : mb);
-    const trailerHash = seal?.diffHash ?? ctx.diffHash;
+    const inferred =
+      trailerFrom && !seal?.diffHash
+        ? inferUniformRangeTrailerHash(repoRoot, trailerFrom)
+        : null;
+    const trailerHash = seal?.diffHash ?? inferred ?? ctx.diffHash;
     if (
       trailerFrom &&
       rangeHasTipTrailers(repoRoot, trailerFrom, trailerHash)
@@ -82,6 +92,11 @@ export function cmdVerify(opts: {
       console.log(
         `know-code: all commits in range have Know-Code-Verified: ${trailerHash.slice(0, 12)}…`,
       );
+      if (inferred && !seal?.diffHash) {
+        console.log(
+          "know-code: verified from commit trailers (no local range-seal.json)",
+        );
+      }
       process.exit(0);
     }
     console.error(
@@ -91,8 +106,9 @@ export function cmdVerify(opts: {
     process.exit(1);
   }
 
-  if (headHasTrailerLocal(repoRoot, ctx.headRef, ctx.diffHash)) {
-    console.log("know-code: HEAD trailer verified");
+  const headMatch = matchHeadTrailer(repoRoot, ctx.headRef, candidates);
+  if (headMatch) {
+    console.log(`know-code: HEAD trailer verified (${headMatch.label})`);
     process.exit(0);
   }
 
@@ -104,9 +120,11 @@ export function cmdVerify(opts: {
   if (aheadCount > 0 && mb !== ctx.headRef) {
     const trailers = trailersInRange(repoRoot, mb, ctx.headRef);
     console.log(`  trailers in ${mb.slice(0, 12)}..HEAD: ${trailers.length}`);
-    if (trailers.includes(ctx.diffHash)) {
-      console.log("know-code: verified (range)");
-      process.exit(0);
+    for (const c of candidates) {
+      if (trailers.includes(c.hash)) {
+        console.log(`know-code: verified (range, ${c.label})`);
+        process.exit(0);
+      }
     }
   } else {
     console.log("  trailers: skipped full-history scan (on base tip)");
@@ -121,7 +139,9 @@ export function cmdVerify(opts: {
   }
 
   console.error("know-code: no matching Know-Code-Verified trailer");
-  console.error(`know-code: add trailer: Know-Code-Verified: ${ctx.diffHash}`);
+  console.error(
+    `know-code: add trailer: Know-Code-Verified: ${primary.hash}`,
+  );
   console.error('know-code: tip: know-code commit -m "…" adds the trailer');
   process.exit(1);
 }

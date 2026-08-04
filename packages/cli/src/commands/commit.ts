@@ -6,6 +6,13 @@ import { resolveQuizContext } from "../hash.js";
 import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
 
+function readCommitMessage(path: string): string {
+  if (path === "-") {
+    return readFileSync(0, "utf8");
+  }
+  return readFileSync(path, "utf8");
+}
+
 export function cmdCommit(rawArgs: string[]): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
@@ -78,7 +85,7 @@ export function injectTrailer(args: string[], hash: string): string[] {
       continue;
     }
     if (a === "-F" && args[i + 1] !== undefined) {
-      let msg = readFileSync(args[i + 1], "utf8");
+      let msg = readCommitMessage(args[i + 1]);
       if (!/^Know-Code-Verified:/m.test(msg)) {
         msg = `${msg.replace(/\s+$/, "")}\n\n${trailer}\n`;
       }

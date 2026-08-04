@@ -68,8 +68,26 @@ set -e
 test "$forge" -eq 2
 rm -f .know-code/gate.json
 
-node "$KC" grade --score 1 --hash "$HASH" --level lite
-node "$KC" pass --level lite --hash "$HASH"
+node --input-type=module -e "
+  import { writeFileSync } from 'node:fs';
+  const hash = process.argv[1];
+  const digest = process.argv[2];
+  writeFileSync('.know-code/grade-proposal.json', JSON.stringify({
+    version: 1,
+    diffHash: hash,
+    answersDigest: digest,
+    proposedScore: 1,
+    passed: true,
+    perQuestion: [{ id: 'q1', score: 1, feedback: 'smoke ok' }],
+    rubricVersion: '1',
+    gradedBy: 'smoke',
+    gradedAt: new Date().toISOString(),
+    level: 'lite',
+  }, null, 2) + '\n');
+" "$HASH" "$(node -e "const f=require('fs');const a=JSON.parse(f.readFileSync('.know-code/answers.json','utf8'));console.log(a.answersDigest)")"
+
+node "$KC" grade --accept --hash "$HASH" --level lite --passphrase "$KNOW_CODE_ATTEST_PASSPHRASE"
+node "$KC" pass --level lite --hash "$HASH" --passphrase "$KNOW_CODE_ATTEST_PASSPHRASE"
 node "$KC" check
 node "$KC" range seal
 

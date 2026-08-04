@@ -116,6 +116,17 @@ export async function cmdRangeSeal(opts: {
     process.exit(1);
   }
 
+  const staged = git(["diff", "--cached", "--name-only"], repoRoot, {
+    allowFail: true,
+  }).trim();
+  if (staged) {
+    console.error(
+      "know-code: range seal blocked — staged changes are not committed yet.",
+    );
+    console.error("know-code: next: know-code commit -m \"…\"  (then range seal)");
+    process.exit(1);
+  }
+
   const sealMode: RangeSealMode =
     opts.rewrite || config.rangeSeal === "rewrite" ? "rewrite" : "receipt";
 

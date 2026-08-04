@@ -29,9 +29,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: chtnnh/know-code/action@v0.1.4
+      - uses: chtnnh/know-code/action@v0.2.0
         with:
           base-branch: main
+          require-range-trailers: true
 ```
 
 ## Composite action inputs
@@ -40,13 +41,22 @@ jobs:
 |-------|---------|-------------|
 | `base-branch` | `main` | Must match local `baseBranch` (`know-code config`) |
 | `require-all` | `false` | Stricter messaging when trailers missing |
-| `version` | `^0.1.4` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
+| `require-range-trailers` | `false` | Every commit ahead of base must share the same `Know-Code-Verified` hash (rewrite teams) |
+| `version` | `^0.2.0` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
 
 ## What verify checks
 
-1. **Primary:** HEAD commit message contains `Know-Code-Verified: <current-hash>`.
-2. **Secondary:** If HEAD is ahead of the base branch, scan trailers on that range only.
-3. **`--require-range-trailers`:** After `range seal --rewrite`, every commit from `rangeFromOid` must carry the sealed hash (reads `.know-code/range-seal.json`).
+Default `know-code verify` (one CI command for all merge styles):
+
+1. **HEAD trailer** must match one of:
+   - **merge-base..HEAD** — cumulative diff since the base branch (range batches, squash merges, PR tips)
+   - **index** — empty-tree → current tree (single-commit / hotfix)
+   - **range-seal** or **uniform-trailers** — when present locally
+2. **Fallback:** any commit in `merge-base..HEAD` carries a matching trailer (pre-squash PR branches).
+
+Squash merges only need the **squash commit** to carry a trailer for the combined diff — intermediate commits are not checked.
+
+**Strict opt-in:** `--require-range-trailers` — every commit in the range must share the same trailer (rewrite teams only).
 
 Use `know-code commit -m "…"` locally so the trailer is attached automatically.
 

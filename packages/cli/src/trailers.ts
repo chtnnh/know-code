@@ -6,6 +6,30 @@ import { git } from "./git.js";
 import { rangeCommitOids } from "./range.js";
 
 const TRAILER_RE = /^Know-Code-Verified:\s*[0-9a-f]{64}\s*$/im;
+const TRAILER_HASH_RE = /^Know-Code-Verified:\s*([0-9a-f]{64})\s*$/im;
+
+export function trailerHashFromMessage(message: string): string | null {
+  const m = message.match(TRAILER_HASH_RE);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/** When every commit in fromOid..HEAD carries the same trailer hash, return it. */
+export function inferUniformRangeTrailerHash(
+  repoRoot: string,
+  fromOid: string,
+): string | null {
+  const commits = rangeCommitOids(repoRoot, fromOid);
+  if (!commits.length) return null;
+  let hash: string | null = null;
+  for (const c of commits) {
+    const msg = git(["log", "-1", "--format=%B", c], repoRoot);
+    const h = trailerHashFromMessage(msg);
+    if (!h) return null;
+    if (!hash) hash = h;
+    else if (hash !== h) return null;
+  }
+  return hash;
+}
 
 export function messageWithTrailer(message: string, hash: string): string {
   const trailer = `Know-Code-Verified: ${hash}`;

@@ -28,7 +28,9 @@ Use `know-code hash` and `know-code config --json` to see the active scope.
 | `receipt` (default) | Signed `.know-code/range-seal.json`; HEAD should carry trailer for CI |
 | `rewrite` | `range seal --rewrite` stamps `Know-Code-Verified: <hash>` on every commit in range (`git push --force-with-lease`) |
 
-After `range seal --rewrite`, `verify --require-range-trailers` checks trailers against `range-seal.json` (not the post-seal index hash). `check` allows push when the sealed range + gate match.
+After `range seal --rewrite`, `check` allows push when the sealed range + gate match. CI uses default `know-code verify`, which accepts a range-hash trailer on HEAD even when the index hash differs — no rewrite required for squash workflows.
+
+Use `verify --require-range-trailers` only when every commit in a batch must carry the same trailer (strict, non-squash teams).
 
 ## Attestation
 

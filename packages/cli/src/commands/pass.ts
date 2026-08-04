@@ -86,15 +86,12 @@ export async function cmdPass(opts: {
 
   console.log(`know-code: gate sealed (${level}, scope=${ctx.scope})`);
   console.log(`know-code: hash ${ctx.diffHash}`);
+  console.log(
+    'know-code: next: know-code commit -m "<message>" (adds Know-Code-Verified trailer)',
+  );
   if (ctx.scope === "range") {
     console.log(
-      "know-code: next: know-code range seal   # finish range (optional --rewrite)",
+      "know-code: then: know-code range seal   # after commit (optional --rewrite)",
     );
   }
-  console.log(
-    "know-code: optional commit trailer: Know-Code-Verified: " + ctx.diffHash,
-  );
-  console.log(
-    'know-code: commit with: know-code commit -m "<message>" (adds Know-Code-Verified trailer)',
-  );
 }
