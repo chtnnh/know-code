@@ -17,10 +17,14 @@ inputs:
     description: If true, fail when no matching trailer is present (stricter messaging)
     required: false
     default: "false"
+  require-range-trailers:
+    description: If true, verify every commit in the range has Know-Code-Verified trailers
+    required: false
+    default: "false"
   version:
     description: npm version range for know-code when not building from this repo
     required: false
-    default: "^0.1.4"
+    default: "^0.2.0"
 
 runs:
   using: composite
@@ -58,8 +62,11 @@ runs:
     - name: Verify Know-Code-Verified trailer
       shell: bash
       run: |
+        ARGS=""
         if [[ "${{ inputs.require-all }}" == "true" ]]; then
-          know-code verify --require-all
-        else
-          know-code verify
+          ARGS="$ARGS --require-all"
         fi
+        if [[ "${{ inputs.require-range-trailers }}" == "true" ]]; then
+          ARGS="$ARGS --require-range-trailers"
+        fi
+        know-code verify $ARGS

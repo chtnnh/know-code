@@ -121,7 +121,7 @@ if [[ "${KNOW_CODE_OVERRIDE:-}" == "1" ]]; then
   deny_json "know-code: OVERRIDE denied in agent hooks. Human: run know-code override on a TTY, then KNOW_CODE_OVERRIDE=1 outside the agent."
 fi
 
-REASON="know-code: blocked. Flow: know-code taught → ask → grade → pass → know-code commit. Human emergency: know-code override"
+REASON="know-code: blocked. Flow: taught → questions → ask → grade propose → grade --review → pass → commit. Human: know-code status"
 
 if run_check; then
   allow_json
