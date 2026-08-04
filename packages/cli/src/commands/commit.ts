@@ -50,6 +50,7 @@ export function cmdCommit(rawArgs: string[]): void {
   const result = spawnSync("git", ["commit", ...finalArgs], {
     cwd: repoRoot,
     stdio: "inherit",
+    env: { ...process.env, KNOW_CODE_COMMIT: "1" },
   });
 
   if (result.status !== 0) {

@@ -34,6 +34,10 @@ export function runCheck(repoRoot: string): CheckResult {
 
   if (isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
     if (config.requireTrailer && !headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash)) {
+      // know-code commit/amend attaches the trailer on the new/amended commit.
+      if (process.env.KNOW_CODE_COMMIT === "1") {
+        return { allowed: true };
+      }
       return {
         allowed: false,
         reason: "requireTrailer: HEAD missing Know-Code-Verified trailer",
