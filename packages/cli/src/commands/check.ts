@@ -1,6 +1,9 @@
 import { readConfig } from "../config.js";
-import { isSignedGateOpen, readGate } from "../gate.js";
-import { resolveQuizContext } from "../hash.js";
+import {
+  isSignedGateEffective,
+  readGate,
+  resolveEffectiveQuizState,
+} from "../gate.js";
 import { CANONICAL_FLOW } from "../grading.js";
 import { formatCheckDeny } from "../pipeline.js";
 import { tryOverrideBypass } from "../override.js";
@@ -29,11 +32,16 @@ export function runCheck(repoRoot: string): CheckResult {
   }
 
   const config = readConfig(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
+  const state = resolveEffectiveQuizState(repoRoot, config);
+  const { ctx, effectiveHash, commitDrift } = state;
   const receipt = readGate(repoRoot);
 
-  if (isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
-    if (config.requireTrailer && !headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash)) {
+  if (isSignedGateEffective(repoRoot, receipt, state, config.level)) {
+    const trailerOk =
+      headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash) ||
+      (commitDrift &&
+        headHasTrailer(repoRoot, ctx.headRef, effectiveHash));
+    if (config.requireTrailer && !trailerOk) {
       // know-code commit/amend attaches the trailer on the new/amended commit.
       if (process.env.KNOW_CODE_COMMIT === "1") {
         return { allowed: true };
@@ -58,7 +66,8 @@ export function runCheck(repoRoot: string): CheckResult {
 export function cmdCheck(): never {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
+  const state = resolveEffectiveQuizState(repoRoot, config);
+  const { ctx, effectiveHash, commitDrift } = state;
   const result = runCheck(repoRoot);
 
   if (result.allowed) {
@@ -73,9 +82,15 @@ export function cmdCheck(): never {
       );
     } else {
       const receipt = readGate(repoRoot);
-      console.error(
-        `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
-      );
+      if (commitDrift) {
+        console.error(
+          `know-code: gate open (${receipt!.level}, ${ctx.scope}) — tree unchanged since pass (${effectiveHash.slice(0, 12)}…)`,
+        );
+      } else {
+        console.error(
+          `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
+        );
+      }
     }
     process.exit(0);
   }

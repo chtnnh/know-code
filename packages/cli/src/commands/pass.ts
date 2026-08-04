@@ -5,7 +5,7 @@ import {
   assertGradeForHash,
   assertTaughtForHash,
 } from "../attest.js";
-import { writeGate } from "../gate.js";
+import { materializedTreeOid, writeGate } from "../gate.js";
 import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
 import { sealPayload } from "../seal.js";
@@ -70,6 +70,7 @@ export async function cmdPass(opts: {
     rangeFromOid: ctx.rangeFromOid,
     commitCount: ctx.commitCount,
     answersDigest: answers.answersDigest,
+    gatedTreeOid: materializedTreeOid(repoRoot),
   };
 
   try {

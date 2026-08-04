@@ -1,8 +1,8 @@
 import { readAnswers, readGrade, readTaught } from "../attest.js";
 import { readConfig } from "../config.js";
-import { isSignedGateOpen, readGate } from "../gate.js";
+import { runCheck } from "./check.js";
+import { readGate, resolveEffectiveQuizState } from "../gate.js";
 import { readGradeProposal } from "../grading.js";
-import { resolveQuizContext } from "../hash.js";
 import { evaluatePipeline } from "../pipeline.js";
 import { readRangeSession } from "../range.js";
 import { diffStat, logOneline, mergeBase } from "../git.js";
@@ -13,15 +13,13 @@ import { readAttestMeta, verifyPayload } from "../seal.js";
 export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
+  const { ctx, effectiveHash, commitDrift } = resolveEffectiveQuizState(
+    repoRoot,
+    config,
+  );
   const session = readRangeSession(repoRoot);
   const receipt = readGate(repoRoot);
-  const allowed = isSignedGateOpen(
-    repoRoot,
-    receipt,
-    ctx.diffHash,
-    config.level,
-  );
+  const allowed = runCheck(repoRoot).allowed;
   const from = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
   const stat = diffStat(repoRoot, from, ctx.headRef);
   const log = logOneline(repoRoot, from, ctx.headRef);
@@ -32,12 +30,12 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   const pub = meta?.pubKey;
   const taughtOk =
     !!taught &&
-    taught.diffHash === ctx.diffHash &&
+    taught.diffHash === effectiveHash &&
     !!pub &&
     verifyPayload(pub, taught as unknown as Record<string, unknown> & { sig?: string; keyId?: string });
   const gradeOk =
     !!grade &&
-    grade.diffHash === ctx.diffHash &&
+    grade.diffHash === effectiveHash &&
     !!pub &&
     verifyPayload(pub, grade as unknown as Record<string, unknown> & { sig?: string; keyId?: string });
 
@@ -53,6 +51,8 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     attestKeyId: meta?.keyId || null,
     attestReady: !!meta,
     diffHash: ctx.diffHash,
+    effectiveHash: commitDrift ? effectiveHash : undefined,
+    commitDrift,
     scope: ctx.scope,
     commitCount: ctx.commitCount,
     rangeActive: !!session,
@@ -60,12 +60,12 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     headRef: ctx.headRef,
     commitRange: ctx.commitRange,
     receipt,
-    taught: taught?.diffHash === ctx.diffHash ? taught : null,
+    taught: taught?.diffHash === effectiveHash ? taught : null,
     taughtSealed: taughtOk,
-    answers: answers?.diffHash === ctx.diffHash,
-    grade: grade?.diffHash === ctx.diffHash ? grade : null,
+    answers: answers?.diffHash === effectiveHash,
+    grade: grade?.diffHash === effectiveHash ? grade : null,
     gradeSealed: gradeOk,
-    gradeProposal: proposal?.diffHash === ctx.diffHash ? true : false,
+    gradeProposal: proposal?.diffHash === effectiveHash ? true : false,
     overrideEnv: process.env.KNOW_CODE_OVERRIDE === "1",
     overrideAllow: hasValidOverrideAllow(repoRoot),
     diffStat: stat,
@@ -93,6 +93,11 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     `  attest:       ${meta?.keyId ? `keyId=${meta.keyId}` : "not initialized (attest-init)"}`,
   );
   console.log(`  hash:         ${ctx.diffHash}`);
+  if (commitDrift) {
+    console.log(
+      `  gate hash:    ${effectiveHash} (tree unchanged since pass)`,
+    );
+  }
   console.log(`  scope:        ${ctx.scope}`);
   console.log(`  range:        ${ctx.commitRange}`);
   console.log(`  base:         ${ctx.baseRef}`);
@@ -105,23 +110,23 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   }
   console.log(
     `  taught:       ${
-      taught?.diffHash === ctx.diffHash
+      taught?.diffHash === effectiveHash
         ? `${taught.skipped ? "skipped" : "yes"} sealed=${taughtOk ? "yes" : "no"}`
         : "no"
     }`,
   );
   console.log(
-    `  answers:      ${answers?.diffHash === ctx.diffHash ? "yes" : "no"}`,
+    `  answers:      ${answers?.diffHash === effectiveHash ? "yes" : "no"}`,
   );
   console.log(
     `  grade:        ${
-      grade?.diffHash === ctx.diffHash
+      grade?.diffHash === effectiveHash
         ? `${grade.score} (${grade.passed ? "pass" : "fail"}) sealed=${gradeOk ? "yes" : "no"}`
         : "no"
     }`,
   );
   console.log(
-    `  grade-proposal: ${proposal?.diffHash === ctx.diffHash ? "yes" : "no"}`,
+    `  grade-proposal: ${proposal?.diffHash === effectiveHash ? "yes" : "no"}`,
   );
   if (process.env.KNOW_CODE_OVERRIDE === "1" || hasValidOverrideAllow(repoRoot)) {
     console.log(

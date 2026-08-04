@@ -1,8 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { readConfig } from "../config.js";
-import { isSignedGateOpen, readGate } from "../gate.js";
-import { resolveQuizContext } from "../hash.js";
+import {
+  isSignedGateEffective,
+  readGate,
+  resolveEffectiveQuizState,
+} from "../gate.js";
 import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
 
@@ -16,7 +19,8 @@ function readCommitMessage(path: string): string {
 export function cmdCommit(rawArgs: string[]): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
+  const state = resolveEffectiveQuizState(repoRoot, config);
+  const { ctx } = state;
 
   if (process.env.KNOW_CODE_OVERRIDE === "1") {
     const bypass = tryOverrideBypass(repoRoot);
@@ -29,7 +33,7 @@ export function cmdCommit(rawArgs: string[]): void {
     );
   } else {
     const receipt = readGate(repoRoot);
-    if (!isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
+    if (!isSignedGateEffective(repoRoot, receipt, state, config.level)) {
       console.error("know-code: commit blocked — gate is closed or seal invalid.");
       console.error(
         "know-code: flow: taught → questions → ask → grade propose → grade --review → pass → know-code commit",
@@ -44,7 +48,8 @@ export function cmdCommit(rawArgs: string[]): void {
 
   let finalArgs = [...gitArgs];
   if (withTrailer) {
-    finalArgs = injectTrailer(finalArgs, ctx.diffHash);
+    const trailerHash = state.commitDrift ? state.effectiveHash : ctx.diffHash;
+    finalArgs = injectTrailer(finalArgs, trailerHash);
   }
 
   const result = spawnSync("git", ["commit", ...finalArgs], {
@@ -58,8 +63,9 @@ export function cmdCommit(rawArgs: string[]): void {
   }
 
   if (withTrailer) {
+    const trailerHash = state.commitDrift ? state.effectiveHash : ctx.diffHash;
     console.error(
-      `know-code: committed with Know-Code-Verified: ${ctx.diffHash}`,
+      `know-code: committed with Know-Code-Verified: ${trailerHash}`,
     );
   }
 }

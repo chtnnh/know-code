@@ -57,6 +57,8 @@ export interface GateReceipt {
   rangeFromOid?: string;
   commitCount?: number;
   answersDigest?: string;
+  /** Materialized tree (write-tree) at pass — survives commit-only hash drift. */
+  gatedTreeOid?: string;
   keyId?: string;
   sig?: string;
 }

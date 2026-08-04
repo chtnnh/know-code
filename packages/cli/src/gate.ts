@@ -1,8 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { readConfig } from "./config.js";
+import { git } from "./git.js";
+import { resolveQuizContext } from "./hash.js";
 import { assertSigned } from "./seal.js";
+import { headHasTrailer } from "./verify-helpers.js";
 import { gatePath, knowCodeDir } from "./paths.js";
-import type { GateReceipt, Level } from "./types.js";
+import type { Config, GateReceipt, Level, QuizContext } from "./types.js";
+
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 export function readGate(repoRoot: string): GateReceipt | null {
   const path = gatePath(repoRoot);
@@ -57,4 +62,96 @@ export function isSignedGateOpen(
   } catch {
     return false;
   }
+}
+
+/** Index tree (HEAD + staged) at pass or check time. */
+export function materializedTreeOid(repoRoot: string): string {
+  return git(["write-tree"], repoRoot, { allowFail: true }) || EMPTY_TREE;
+}
+
+/** True when materialized tree still matches the tree sealed at pass. */
+export function isGatedTreeCurrent(
+  repoRoot: string,
+  gatedTreeOid: string,
+): boolean {
+  return materializedTreeOid(repoRoot) === gatedTreeOid;
+}
+
+export interface EffectiveQuizState {
+  ctx: QuizContext;
+  effectiveHash: string;
+  /** Hash changed (e.g. post-commit range) but tree content unchanged. */
+  commitDrift: boolean;
+}
+
+/** True when index matches HEAD (no staged changes beyond tip). */
+export function isIndexAlignedWithHead(repoRoot: string): boolean {
+  const headTree = git(["rev-parse", "HEAD^{tree}"], repoRoot, {
+    allowFail: true,
+  });
+  return Boolean(headTree) && materializedTreeOid(repoRoot) === headTree;
+}
+
+/**
+ * Pre-0.2.0 gates lack gatedTreeOid. Allow commit drift when HEAD trailer matches,
+ * seal is valid, and nothing new is staged (index tree == HEAD tree).
+ */
+function isLegacyCommitDrift(
+  repoRoot: string,
+  gate: GateReceipt,
+  ctx: QuizContext,
+  config: Config,
+): boolean {
+  if (gate.gatedTreeOid || gate.diffHash === ctx.diffHash) return false;
+  if (!isSignedGateOpen(repoRoot, gate, gate.diffHash, config.level)) {
+    return false;
+  }
+  if (!headHasTrailer(repoRoot, ctx.headRef, gate.diffHash)) return false;
+  return isIndexAlignedWithHead(repoRoot);
+}
+
+/**
+ * Quiz hash for pipeline/gate checks. After pass+commit with unchanged tree,
+ * artifacts bound to gate.diffHash stay valid even when ctx.diffHash moved.
+ */
+export function resolveEffectiveQuizState(
+  repoRoot: string,
+  config?: Config,
+): EffectiveQuizState {
+  const cfg = config ?? readConfig(repoRoot);
+  const ctx = resolveQuizContext(repoRoot, cfg);
+  const gate = readGate(repoRoot);
+
+  if (
+    gate &&
+    gate.diffHash !== ctx.diffHash &&
+    isSignedGateOpen(repoRoot, gate, gate.diffHash, cfg.level)
+  ) {
+    if (
+      gate.gatedTreeOid &&
+      isGatedTreeCurrent(repoRoot, gate.gatedTreeOid)
+    ) {
+      return { ctx, effectiveHash: gate.diffHash, commitDrift: true };
+    }
+    if (isLegacyCommitDrift(repoRoot, gate, ctx, cfg)) {
+      return { ctx, effectiveHash: gate.diffHash, commitDrift: true };
+    }
+  }
+
+  return { ctx, effectiveHash: ctx.diffHash, commitDrift: false };
+}
+
+/** Gate open for current or commit-drifted (tree-stable) hash. */
+export function isSignedGateEffective(
+  repoRoot: string,
+  receipt: GateReceipt | null,
+  state: EffectiveQuizState,
+  requiredLevel: Level,
+): boolean {
+  return isSignedGateOpen(
+    repoRoot,
+    receipt,
+    state.effectiveHash,
+    requiredLevel,
+  );
 }

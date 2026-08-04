@@ -7,13 +7,16 @@ import {
   PASS_SCORE,
 } from "./attest.js";
 import { readConfig } from "./config.js";
-import { isSignedGateOpen, readGate } from "./gate.js";
-import { resolveQuizContext } from "./hash.js";
+import {
+  isSignedGateEffective,
+  readGate,
+  resolveEffectiveQuizState,
+} from "./gate.js";
 import { readGradeProposal } from "./grading.js";
 import { knowCodeDir } from "./paths.js";
 import { readAttestMeta } from "./seal.js";
 import { readRangeSession } from "./range.js";
-import type { Config } from "./types.js";
+import type { Config, QuizContext } from "./types.js";
 
 export interface PipelineBlocker {
   step: string;
@@ -33,8 +36,8 @@ function quizExists(repoRoot: string): boolean {
 
 export function evaluatePipeline(repoRoot: string): PipelineStatus {
   const config = readConfig(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
-  const hash = ctx.diffHash;
+  const { ctx, effectiveHash: hash, commitDrift } =
+    resolveEffectiveQuizState(repoRoot, config);
   const blockers: PipelineBlocker[] = [];
 
   const meta = readAttestMeta(repoRoot);
@@ -125,10 +128,14 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
   }
 
   const gate = readGate(repoRoot);
-  const allowed = isSignedGateOpen(repoRoot, gate, hash, config.level);
+  const allowed = isSignedGateEffective(repoRoot, gate, {
+    ctx,
+    effectiveHash: hash,
+    commitDrift,
+  }, config.level);
 
   if (!allowed) {
-    if (!gate || gate.diffHash !== hash) {
+    if (!gate || (gate.diffHash !== hash && !commitDrift)) {
       blockers.push({
         step: "pass",
         message: gate
@@ -153,15 +160,21 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
 export function formatCheckDeny(
   repoRoot: string,
   config: Config,
-  ctx: ReturnType<typeof resolveQuizContext>,
+  ctx: QuizContext,
   receipt: ReturnType<typeof readGate>,
 ): { reason: string; next: string } {
   const pipeline = evaluatePipeline(repoRoot);
+  const { commitDrift } = resolveEffectiveQuizState(repoRoot, config);
 
   if (pipeline.blockers.length) {
     const b = pipeline.blockers[0];
     let reason = b.message;
-    if (b.step === "pass" && receipt && receipt.diffHash !== ctx.diffHash) {
+    if (
+      b.step === "pass" &&
+      receipt &&
+      receipt.diffHash !== ctx.diffHash &&
+      !commitDrift
+    ) {
       reason =
         "Diff hash changed — you may have staged new changes or amended commits. Run `know-code status`.";
     }
@@ -177,7 +190,7 @@ export function formatCheckDeny(
       next: "know-code pass",
     };
   }
-  if (receipt.diffHash !== ctx.diffHash) {
+  if (receipt.diffHash !== ctx.diffHash && !commitDrift) {
     return {
       reason:
         "diff changed since last quiz — staged new work or amended commits?",
