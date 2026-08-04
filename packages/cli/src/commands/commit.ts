@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { readConfig } from "../config.js";
 import { isSignedGateOpen, readGate } from "../gate.js";
 import { resolveQuizContext } from "../hash.js";
@@ -24,7 +25,7 @@ export function cmdCommit(rawArgs: string[]): void {
     if (!isSignedGateOpen(repoRoot, receipt, ctx.diffHash, config.level)) {
       console.error("know-code: commit blocked — gate is closed or seal invalid.");
       console.error(
-        "know-code: flow: range begin → taught → ask → grade → pass → know-code commit",
+        "know-code: flow: taught → questions → ask → grade propose → grade --review → pass → know-code commit",
       );
       process.exit(2);
     }
@@ -63,24 +64,35 @@ export function injectTrailer(args: string[], hash: string): string[] {
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if ((a === "-m" || a === "-F") && args[i + 1] !== undefined) {
-      if (a === "-m") {
-        let msg = args[i + 1];
-        if (!/^Know-Code-Verified:/m.test(msg)) {
-          msg = `${msg.replace(/\s+$/, "")}\n\n${trailer}\n`;
-        }
-        out.push("-m", msg);
-        i++;
-        injected = true;
-        continue;
+    if (
+      (a === "-m" || a === "--message") &&
+      args[i + 1] !== undefined
+    ) {
+      let msg = args[i + 1];
+      if (!/^Know-Code-Verified:/m.test(msg)) {
+        msg = `${msg.replace(/\s+$/, "")}\n\n${trailer}\n`;
       }
+      out.push(a === "--message" ? "-m" : a, msg);
+      i++;
+      injected = true;
+      continue;
+    }
+    if (a === "-F" && args[i + 1] !== undefined) {
+      let msg = readFileSync(args[i + 1], "utf8");
+      if (!/^Know-Code-Verified:/m.test(msg)) {
+        msg = `${msg.replace(/\s+$/, "")}\n\n${trailer}\n`;
+      }
+      out.push("-m", msg);
+      i++;
+      injected = true;
+      continue;
     }
     out.push(a);
   }
 
   if (!injected) {
     console.error(
-      'know-code: pass a message with -m "..." (trailer is added automatically).',
+      'know-code: pass a message with -m "…", --message "…", or -F <file> (trailer is added automatically).',
     );
     process.exit(1);
   }

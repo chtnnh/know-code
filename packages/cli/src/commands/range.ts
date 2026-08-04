@@ -22,7 +22,7 @@ export function cmdRangeBegin(opts: { from?: string }): void {
     const session = beginRangeSession(repoRoot, opts.from);
     console.log(`know-code: range began at ${session.fromOid.slice(0, 12)}…`);
     console.log(`know-code: quiz once for commits ${session.fromOid.slice(0, 8)}..HEAD`);
-    console.log("know-code: next: teach → questions → ask → grade → pass → range seal");
+    console.log("know-code: next: taught → questions → ask → grade propose → grade --review → pass → range seal");
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
@@ -63,11 +63,26 @@ export function cmdRangeStatus(json = false): void {
   console.log(`  sealed:    ${seal ? seal.sealMode : "no"}`);
 }
 
-export function cmdRangeAbort(): void {
+export function cmdRangeAbort(opts: { keepSeal?: boolean } = {}): void {
   const repoRoot = findGitRoot();
   clearRangeSession(repoRoot);
-  clearRangeSeal(repoRoot);
-  console.log("know-code: range session cleared.");
+  if (!opts.keepSeal) {
+    clearRangeSeal(repoRoot);
+    console.log("know-code: range session and seal cleared.");
+  } else {
+    console.log("know-code: range session cleared (seal kept).");
+  }
+}
+
+export function cmdRangeContinue(opts: { yes?: boolean } = {}): void {
+  const repoRoot = findGitRoot();
+  if (!opts.yes && process.stdin.isTTY) {
+    process.stderr.write(
+      "Start a new range for upcoming commits? Run with --yes to confirm.\n",
+    );
+    process.exit(1);
+  }
+  cmdRangeBegin({});
 }
 
 export async function cmdRangeSeal(opts: {
@@ -165,6 +180,10 @@ export async function cmdRangeSeal(opts: {
 
   clearRangeSession(repoRoot);
   console.log(`know-code: range sealed (${sealMode})`);
+  console.log("");
+  console.log(
+    "know-code: start a new range for upcoming commits: know-code range continue --yes",
+  );
 }
 
 export { rangeHasTipTrailers } from "../trailers.js";

@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
@@ -236,4 +237,67 @@ function mergeCodexHooks(destPath: string, scriptPath: string): void {
 function hookCommand(format: string, scriptPath: string): string {
   const quoted = `'${scriptPath.replace(/'/g, `'\\''`)}'`;
   return `KNOW_CODE_HOOK_FORMAT=${format} bash ${quoted}`;
+}
+
+export function uninstallGitHooks(repoRoot: string): void {
+  for (const name of ["pre-commit", "pre-push"] as const) {
+    const hookPath = join(gitHooksDir(repoRoot), name);
+    if (!existsSync(hookPath)) continue;
+    const content = readFileSync(hookPath, "utf8");
+    if (!content.includes(HOOK_MARKER)) continue;
+    const backup = `${hookPath}.know-code-backup`;
+    if (existsSync(backup)) {
+      copyFileSync(backup, hookPath);
+      chmodSync(hookPath, 0o755);
+    } else {
+      unlinkSync(hookPath);
+    }
+  }
+}
+
+export function uninstallAgentHooks(
+  repoRoot: string,
+  agents: AgentId[],
+): void {
+  for (const agent of agents) {
+    if (agent === "claude") {
+      const dest = join(repoRoot, ".claude", "settings.json");
+      if (!existsSync(dest)) continue;
+      const existing = readJsonFile(dest);
+      const hooks = (existing.hooks as Record<string, unknown>) || {};
+      const pre = Array.isArray(hooks.PreToolUse)
+        ? (hooks.PreToolUse as unknown[]).filter(
+            (e) => !JSON.stringify(e).includes("know-code"),
+          )
+        : [];
+      writeJson(dest, { ...existing, hooks: { ...hooks, PreToolUse: pre } });
+    }
+    if (agent === "cursor") {
+      const dest = join(repoRoot, ".cursor", "hooks.json");
+      if (!existsSync(dest)) continue;
+      const existing = readJsonFile(dest);
+      const hooks = (existing.hooks as Record<string, unknown>) || {};
+      const before = Array.isArray(hooks.beforeShellExecution)
+        ? (hooks.beforeShellExecution as unknown[]).filter(
+            (e) => !JSON.stringify(e).includes("know-code"),
+          )
+        : [];
+      writeJson(dest, {
+        ...existing,
+        hooks: { ...hooks, beforeShellExecution: before },
+      });
+    }
+    if (agent === "codex") {
+      const dest = join(repoRoot, ".codex", "hooks.json");
+      if (!existsSync(dest)) continue;
+      const existing = readJsonFile(dest);
+      const hooks = (existing.hooks as Record<string, unknown>) || {};
+      const pre = Array.isArray(hooks.PreToolUse)
+        ? (hooks.PreToolUse as unknown[]).filter(
+            (e) => !JSON.stringify(e).includes("know-code"),
+          )
+        : [];
+      writeJson(dest, { ...existing, hooks: { ...hooks, PreToolUse: pre } });
+    }
+  }
 }
