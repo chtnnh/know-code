@@ -4,10 +4,16 @@ know-code gates shipping at two layers: **git hooks** and **agent shell hooks**.
 
 ## Git hooks
 
-Installed by `know-code init`:
+Installed by `know-code init` (or refresh with `know-code hooks install`):
 
 - **pre-commit** — runs `know-code check`
 - **pre-push** — runs `know-code check`
+
+Refresh after upgrading the CLI:
+
+```bash
+know-code hooks install
+```
 
 Uninstall (restores backup if present):
 

@@ -3,8 +3,7 @@ import { dirname, join } from "node:path";
 import { readConfig, writeConfig } from "../config.js";
 import {
   installAgentHooks,
-  installGitPreCommit,
-  installGitPrePush,
+  installGitHooks,
   type AgentId,
 } from "../hooks.js";
 import { findGitRoot, knowCodeDir } from "../paths.js";
@@ -95,8 +94,8 @@ export function cmdInit(opts: {
   writeConfig(repoRoot, config);
   ensureGitignore(repoRoot);
 
-  for (const install of [installGitPreCommit, installGitPrePush]) {
-    const hook = install(repoRoot);
+  const { preCommit, prePush } = installGitHooks(repoRoot);
+  for (const hook of [preCommit, prePush]) {
     const label = hook.path.endsWith("pre-commit") ? "pre-commit" : "pre-push";
     console.log(
       hook.created

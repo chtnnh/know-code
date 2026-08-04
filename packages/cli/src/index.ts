@@ -28,7 +28,7 @@ import { cmdVerify } from "./commands/verify.js";
 import { cmdQuizValidate } from "./commands/quiz-validate.js";
 import { CANONICAL_FLOW } from "./grading.js";
 import { findGitRoot } from "./paths.js";
-import { uninstallGitHooks, uninstallAgentHooks } from "./hooks.js";
+import { uninstallGitHooks, uninstallAgentHooks, cmdHooksInstall } from "./hooks.js";
 import { cmdOverride } from "./override.js";
 import { cmdQuestions } from "./questions.js";
 import { cmdAttestInit } from "./seal.js";
@@ -71,6 +71,7 @@ Usage:
   know-code override
   know-code status [--json] [--next]
   know-code hash|verify [--require-all] [--require-range-trailers] [--range-seal]
+  know-code hooks install
   know-code hooks uninstall [--agents claude,cursor,codex]
   know-code skills [--global] [--agents …] [-y]
   know-code version|help
@@ -351,6 +352,10 @@ function main(): void {
         cmdAmend(rest[0] === "--" ? rest.slice(1) : rest);
         break;
       case "hooks":
+        if (subcommand === "install") {
+          cmdHooksInstall();
+          break;
+        }
         if (subcommand === "uninstall") {
           uninstallGitHooks(findGitRoot());
           if (flags.agents) {
@@ -362,7 +367,7 @@ function main(): void {
           console.log("know-code: hooks uninstalled (backups preserved if any)");
           break;
         }
-        console.error("know-code hooks: use uninstall\n");
+        console.error("know-code hooks: use install | uninstall\n");
         process.exit(1);
         break;
       case "skills":

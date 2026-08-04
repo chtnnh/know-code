@@ -36,6 +36,7 @@ npm i -g @chtnnh/know-code
 | `know-code reset` | Clear stale `.know-code` artifacts |
 | `know-code override` | Human TTY: one-shot emergency allow |
 | `know-code verify` | Trailer verification (see flags below) |
+| `know-code hooks install` | Install or refresh git pre-commit/pre-push hooks |
 | `know-code hooks uninstall` | Remove git/agent hooks |
 | `know-code skills [--global]` | Install Agent Skills |
 

@@ -20,8 +20,10 @@
 - **`config set <key> <value>`** · expanded **`init`** flags
 - **`commit -F`** / **`--message`** · **`know-code amend`**
 - **`know-code reset`** · **`range abort --keep-seal`**
-- **`hooks uninstall`** · hidden passphrase input
+- **`hooks install`** · **`hooks uninstall`** — refresh or remove git/agent hooks
 - **`verify --range-seal`** · **`requireTrailer`** wired in check
+- **Git hooks** — pre-commit/pre-push preserve `know-code check` exit code (no false "CLI not found" on gate deny); `doctor` flags outdated hooks
+- **Commit drift** — gate stays valid after `know-code commit` when tree unchanged (`gatedTreeOid`); verify accepts `head-trailer` hash
 - Better deny messages with suggested next command
 - Corrupt JSON errors for gate/taught/grade/answers
 

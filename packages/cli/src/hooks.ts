@@ -10,7 +10,7 @@ import {
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CURSOR_MATCHER } from "./gate-cmd.js";
-import { gitHooksDir } from "./paths.js";
+import { gitHooksDir, findGitRoot } from "./paths.js";
 
 export { CURSOR_MATCHER } from "./gate-cmd.js";
 
@@ -61,14 +61,64 @@ run_check() {
   return 127
 }
 
-if run_check; then
+rc=0
+run_check || rc=$?
+
+if [[ $rc -eq 0 ]]; then
   exit 0
 fi
 
-echo "know-code: CLI not found. Install with: npm i -g @chtnnh/know-code" >&2
-echo "know-code: emergency: know-code override && KNOW_CODE_OVERRIDE=1 …" >&2
-exit 1
+if [[ $rc -eq 127 ]]; then
+  echo "know-code: CLI not found. Install with: npm i -g @chtnnh/know-code" >&2
+  echo "know-code: emergency: know-code override && KNOW_CODE_OVERRIDE=1 …" >&2
+  exit 1
+fi
+
+# check ran and denied (stderr already has reason + next step)
+exit "$rc"
 `;
+}
+
+/** True when an on-disk hook matches the current generated script. */
+export function gitGateHookIsCurrent(content: string): boolean {
+  if (!content.includes(HOOK_MARKER)) return false;
+  return content.includes("run_check || rc=$?");
+}
+
+export function gitHooksNeedUpgrade(repoRoot: string): boolean {
+  for (const name of ["pre-commit", "pre-push"] as const) {
+    const hookPath = join(gitHooksDir(repoRoot), name);
+    if (!existsSync(hookPath)) return true;
+    const content = readFileSync(hookPath, "utf8");
+    if (!gitGateHookIsCurrent(content)) return true;
+  }
+  return false;
+}
+
+export function installGitHooks(repoRoot: string): {
+  preCommit: ReturnType<typeof installGitHook>;
+  prePush: ReturnType<typeof installGitHook>;
+} {
+  return {
+    preCommit: installGitHook(repoRoot, "pre-commit"),
+    prePush: installGitHook(repoRoot, "pre-push"),
+  };
+}
+
+export function cmdHooksInstall(): void {
+  const repoRoot = findGitRoot();
+  const { preCommit, prePush } = installGitHooks(repoRoot);
+  for (const hook of [preCommit, prePush]) {
+    const label = hook.path.endsWith("pre-commit") ? "pre-commit" : "pre-push";
+    console.log(
+      hook.created
+        ? `Installed git ${label} hook → ${hook.path}`
+        : `Updated git ${label} hook → ${hook.path}`,
+    );
+    if (hook.backedUp) {
+      console.log(`Backed up previous hook → ${hook.backedUp}`);
+    }
+  }
 }
 
 function installGitHook(

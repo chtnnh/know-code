@@ -4,10 +4,10 @@ import { readConfig } from "../config.js";
 import { readAttestMeta } from "../seal.js";
 import { resolveQuizContext } from "../hash.js";
 import { evaluatePipeline } from "../pipeline.js";
-import { findGitRoot, knowCodeDir } from "../paths.js";
-import { readRangeSession } from "../range.js";
-import { gitHooksDir } from "../paths.js";
+import { findGitRoot, knowCodeDir, gitHooksDir } from "../paths.js";
 import { join } from "node:path";
+import { readRangeSession } from "../range.js";
+import { gitHooksNeedUpgrade } from "../hooks.js";
 
 export interface DoctorCheck {
   name: string;
@@ -60,16 +60,21 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
 
   const preCommit = join(gitHooksDir(repoRoot), "pre-commit");
   const prePush = join(gitHooksDir(repoRoot), "pre-push");
-  const hooksOk =
+  const hooksPresent =
     existsSync(preCommit) &&
     existsSync(prePush) &&
     readFileContains(preCommit, "know-code") &&
     readFileContains(prePush, "know-code");
+  const hooksOk = hooksPresent && !gitHooksNeedUpgrade(repoRoot);
   checks.push({
     name: "git-hooks",
     ok: hooksOk,
-    message: hooksOk ? "Git hooks installed" : "Git hooks missing or outdated",
-    fix: hooksOk ? undefined : "know-code init",
+    message: hooksOk
+      ? "Git hooks installed"
+      : hooksPresent
+        ? "Git hooks outdated (misleading deny messages on gate failure)"
+        : "Git hooks missing",
+    fix: hooksOk ? undefined : "know-code hooks install",
   });
 
   const session = readRangeSession(repoRoot);
