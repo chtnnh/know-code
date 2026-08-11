@@ -5,11 +5,13 @@ title: CLI reference
 
 # CLI reference
 
-Requires Node 20+. Install the scoped package (binary is still `know-code`):
+Requires Node 20+. Install the scoped package:
 
 ```bash
 npm i -g @chtnnh/know-code
 ```
+
+This installs two identical binaries: `know-code` and the short alias **`kc`** — every command below works as `kc status`, `kc commit -m "…"`, etc. (If your shell aliases `kc` to something else, your alias wins; use `know-code`.)
 
 ## Commands
 

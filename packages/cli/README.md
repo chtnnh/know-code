@@ -26,6 +26,8 @@ know-code attest-init
 know-code skills
 ```
 
+Every command is also available as **`kc`** (`kc status`, `kc taught`, `kc commit -m "…"`).
+
 ## Range workflow (recommended)
 
 One quiz per feature batch — not per commit.

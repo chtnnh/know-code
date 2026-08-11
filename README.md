@@ -27,6 +27,8 @@ know-code skills
 know-code range begin
 ```
 
+Every command is also available as **`kc`** (`kc status`, `kc taught`, `kc commit -m "…"`).
+
 ## The loop
 
 ```text
