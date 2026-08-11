@@ -1,21 +1,32 @@
 # Grading
 
-know-code uses **agent-proposed grading** with **human review and attest**. The human does not self-assign a score.
+know-code uses **agent-proposed grading** with **human review and attest**. You never self-assign a passing score — the agent proposes, you review and seal.
 
 ## Flow
 
-1. Human completes browser quiz (`know-code ask`) → `answers.json`
-2. **Agent** reads answers + quiz + diff context → writes `grade-proposal.json`
-3. **Human** runs `know-code grade --review` (TUI shows per-question scores + feedback)
-4. Human attests passphrase → sealed `grade.json`
-5. Human runs `know-code pass` → sealed `gate.json`
+```mermaid
+flowchart LR
+    A[Agent: ask] --> B[You: browser answers]
+    B --> C[Agent: grade-proposal.json]
+    C --> D[You: grade --review]
+    D --> E[You: pass]
+    E --> F[Gate opens]
+```
+
+| Step | Who | What |
+|------|-----|------|
+| 1 | **Agent** runs `ask` · **you** submit answers | `answers.json` |
+| 2 | **Agent** | Reads answers + quiz + diff → writes `grade-proposal.json` |
+| 3 | **You** | `know-code grade --review` (TUI: per-question scores + feedback) |
+| 4 | **You** | Attest passphrase → sealed `grade.json` |
+| 5 | **You** | `know-code pass` → sealed `gate.json` (gate opens) |
 
 ```bash
-# Agent (after ask)
-know-code grade propose --json    # optional context helper
-# Agent writes .know-code/grade-proposal.json
+# Agent (after you submitted the browser quiz)
+know-code grade propose --json    # optional rubric helper
+# agent writes .know-code/grade-proposal.json
 
-# Human
+# You
 know-code grade --review          # or --accept to skip score adjustment
 know-code pass
 ```

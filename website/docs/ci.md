@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: chtnnh/know-code/action@v0.2.0
+      - uses: chtnnh/know-code/action@v0.3.0
         with:
           base-branch: main
           require-range-trailers: true
@@ -42,7 +42,7 @@ jobs:
 | `base-branch` | `main` | Must match local `baseBranch` (`know-code config`) |
 | `require-all` | `false` | Stricter messaging when trailers missing |
 | `require-range-trailers` | `false` | Every commit ahead of base must share the same `Know-Code-Verified` hash (rewrite teams) |
-| `version` | `^0.2.0` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
+| `version` | `^0.3.0` | npm pin for `@chtnnh/know-code` when not building from this monorepo |
 
 ## What verify checks
 

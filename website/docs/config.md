@@ -32,6 +32,9 @@ Each developer runs `know-code init` and `know-code attest-init` on their machin
 | `rangeMode` | `auto` \| `index` \| `range` | `auto` | manual JSON | How quiz hash scope is chosen (see below) |
 | `rangeSeal` | `receipt` \| `rewrite` | `receipt` | manual JSON | Default `range seal` behavior when `--rewrite` omitted |
 | `requireAttest` | boolean | `true` | manual JSON | When true, `taught` / `grade` / `pass` / `range seal` need Ed25519 seals |
+| `requireGradeProposal` | boolean | `true` | manual JSON | Require agent `grade-proposal.json` before human grade |
+| `allowSelfScore` | boolean | `false` | manual JSON | Allow legacy `grade --score` without proposal |
+| `enforcePipeline` | boolean | **`true`** (0.3.0) | manual JSON | Require sealed taught (+ quiz flow) before `ask` / pass |
 
 ### `rangeMode`
 

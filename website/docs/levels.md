@@ -5,6 +5,8 @@ title: Levels
 
 # Levels
 
+Quiz depth is set at `init` or in config. The **agent** must write at least `minQuestions` for the active level (from `know-code questions`).
+
 | Level | Questions | Focus |
 |-------|-----------|-------|
 | `lite` | 2–3 | What changed |

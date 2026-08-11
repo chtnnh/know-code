@@ -21,6 +21,8 @@ Never set `KNOW_CODE_OVERRIDE` or `KNOW_CODE_ATTEST_PASSPHRASE` from the agent.
 
 **Config:** `~/.know-code/config.json` + gitignored `.know-code/config.json`
 
-CLI: `npm run know-code -- …`
+CLI (always local build in this repo): `npm run know-code -- …`  
+After `npm run build`, keep bare `know-code` pointed here: `npm link -w @chtnnh/know-code`  
+(`know-code doctor` warns if PATH still hits a stale global.)
 
 Docs: https://kc.chtnnhfoundation.org

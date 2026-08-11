@@ -5,29 +5,45 @@ title: Skills
 
 # Skills
 
-Two complementary skills ship in this repository under `skills/`.
+Two skills ship in this repository. Install them into your agent harness so it knows the human/agent split.
 
 ## know-code-teach
 
-Explains architecture, decisions, and trade-offs **before** edits and while coding. It never opens the gate.
+**Agent** explains architecture, decisions, and trade-offs **before** edits and while coding. It never opens the gate.
 
-Use at session start, before non-trivial work, after a gate deny (before the quiz), or when you ask the agent to catch you up.
+When to use: session start, before non-trivial work, after a gate deny (before the quiz), or when you ask the agent to catch you up.
 
-At feature start, pair with `know-code range begin`. Skip only if you explicitly say so (“skip teach”, “just do it”). After teach or skip, the **human** seals `know-code taught`.
+After the agent teaches, **you** seal receipt:
+
+```bash
+know-code taught
+```
+
+Skip only if you explicitly say so ("skip teach", "just do it") — then you still run `taught --skip` yourself.
 
 ## know-code
 
-Gates commit / push / PR until you pass a browser quiz. Typical agent steps:
+**Agent** runs the gate workflow; **you** own attest seals and browser answers.
 
-1. Ensure `know-code range begin` is active for multi-commit work
-2. Ensure the human sealed `know-code taught` for the current hash
-3. Run `know-code questions --json`, write `.know-code/quiz.json`
-4. Run `know-code ask`
-5. Human seals `grade` (≥80%) and `pass`
-6. Human runs `know-code commit -m "…"` (quote the message)
-7. Human runs `know-code range seal` when the batch is done
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | **You** | `know-code range begin` (multi-commit batches) |
+| 2 | **Agent** | Teach (or you skipped) |
+| 3 | **You** | `know-code taught` |
+| 4 | **Agent** | `questions` → write `quiz.json` → `quiz validate` |
+| 5 | **Agent** | `know-code ask` → **you** answer in browser |
+| 6 | **Agent** | Write `grade-proposal.json` |
+| 7 | **You** | `grade --review` → `pass` |
+| 8 | **You** | `git add` per slice |
+| 9 | **Agent** | `git commit -m "…"` (plain git, gate open) |
+| 10 | **You** | `range seal --rewrite` → `git push` |
 
-Hard rules: quiz in the **browser**, not chat; never forge seals or set `KNOW_CODE_OVERRIDE` / `KNOW_CODE_ATTEST_PASSPHRASE` from the agent.
+Hard rules for the agent:
+
+- Quiz answers happen in the **browser**, never in chat
+- Never set `KNOW_CODE_OVERRIDE` or `KNOW_CODE_ATTEST_PASSPHRASE`
+- Never forge signed artifacts (`taught`, `grade`, `pass`, `range-seal`)
+- Never run `git add` (you stage in your terminal)
 
 ## Install into your harness
 
@@ -45,6 +61,6 @@ know-code skills --global
 
 Global installs land under `~/.cursor/skills/`, `~/.claude/skills/`, `~/.codex/skills/`. List with `npx skills ls -g`.
 
-Optional flags: `know-code skills --agents claude,cursor --yes`
+Optional: `know-code skills --agents claude,cursor --yes`
 
 This repo keeps committed copies under `.agents/skills/`. Local harness links: `npm run link-skills` (gitignored).

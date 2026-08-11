@@ -11,19 +11,21 @@ title: Troubleshooting
 know-code: commit/push blocked — diff changed since last quiz.
 ```
 
-Stage intended changes, then in **your** terminal:
+The diff changed since your last pass. Re-run the pipeline:
+
+| Step | Who | Command |
+|------|-----|---------|
+| Start range (if batch) | **You** | `know-code range begin` |
+| Teach seal | **You** | `know-code taught` |
+| Quiz | **Agent** | `questions` → write `quiz.json` → `ask` |
+| Answer | **You** | Browser tab from `ask` |
+| Grade + pass | **You** | `grade --review` → `pass` |
+| Commit | **Agent** | `know-code commit -m "…"` |
 
 ```bash
-know-code range begin              # if multi-commit batch
-know-code taught                   # or taught --skip
-know-code questions --json         # agent writes quiz.json
-know-code ask --quiz .know-code/quiz.json
-know-code grade --review
-know-code pass
-know-code commit -m "your message"
+know-code status --json
+know-code doctor
 ```
-
-Use `know-code status` and `know-code doctor` to see the next step.
 
 ## Quiz hash mismatch
 
@@ -72,6 +74,22 @@ If `npx skills add` fails, install manually from [skills.md](/skills) or clone t
 ## Stale seals after rebase / pull
 
 Hash changes invalidate receipts. Run `know-code status --json` to see blockers. Re-run the pipeline from `taught` or `know-code reset` to clear artifacts.
+
+## Gate open but `range seal` blocked (pre-0.2.1)
+
+Upgrade to ≥0.2.1 and re-run `know-code pass` once so `gate.json` includes `gatedTreeOid`. Seal honors commit drift (pass on staged batch → commits → seal on tip).
+
+## CI verify accepts wrong trailer (pre-0.2.1)
+
+Fixed in 0.2.1: verify only accepts grounded hashes. Do not rely on a hand-written `Know-Code-Verified` line that does not match `know-code hash` / merge-base..HEAD.
+
+## Pathspec / partial commits after pass
+
+`know-code commit -- path` can shrink the index tree and invalidate `gatedTreeOid`. Prefer staging the full batch (`git add -A`) before `pass`, then commit without pathspecs — or re-pass after intentional tree changes.
+
+## Corrupt `.know-code/*.json`
+
+`status` / `doctor` report a `corrupt` blocker. Fix or `know-code reset` and re-run the pipeline.
 
 ## Wrong attest passphrase
 
@@ -140,6 +158,36 @@ KNOW_CODE_OVERRIDE=1 git commit
 ```
 
 Denied in agent hooks and CI. Logged under `.know-code/override.log`.
+
+## Upgrading to 0.3.0
+
+1. Re-run **`know-code pass`** once so `gate.json` includes `gatedTreeOid` (legacy gates never open).
+2. Refresh hooks: `know-code hooks install` and `know-code init --agents cursor,claude,codex`.
+3. Agents can no longer run raw `git add`, `git commit --amend`, `git merge`, etc. — humans stage outside the agent; agents use `know-code commit` / `know-code amend`.
+4. `enforcePipeline` defaults to **true** — teaching + quiz before pass.
+5. Before shipping: `know-code doctor --strict` (also run by `know-code ship`).
+
+## Agent denied: git add / amend / merge
+
+Expected in 0.3.0. Stage and history rewrite belong to the human (or a non-agent shell). After the quiz:
+
+```bash
+know-code commit -m "feat: …"
+# or
+know-code amend
+```
+
+## Gate closed: missing gatedTreeOid
+
+```text
+gate.json missing gatedTreeOid (legacy)
+```
+
+Re-seal after upgrade:
+
+```bash
+know-code pass
+```
 
 ## pass refused: missing taught / answers / grade
 

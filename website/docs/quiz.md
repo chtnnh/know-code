@@ -1,6 +1,16 @@
 # Quiz format (`quiz.json`)
 
-The agent writes `.know-code/quiz.json` before `know-code ask`. The human answers in the browser.
+The **agent** writes `.know-code/quiz.json`. **You** answer in the browser when the agent runs `know-code ask`. You do not write quiz questions yourself unless you're working without an agent.
+
+## Who does what
+
+| Task | Who |
+|------|-----|
+| `know-code questions` (quota) | Agent |
+| Write / edit `quiz.json` | Agent |
+| `quiz validate` | Agent |
+| `know-code ask` (opens browser) | Agent runs it · **you** submit answers |
+| Read `answers.json` | Agent (for grade proposal) |
 
 ## Schema
 
@@ -32,20 +42,22 @@ The agent writes `.know-code/quiz.json` before `know-code ask`. The human answer
 | `type` | no | `text` (default) or `mcq` |
 | `choices` | mcq only | Array of strings |
 
-## Workflow
+## Agent workflow
 
 ```bash
-know-code questions --json
-know-code questions --template > .know-code/quiz.json
-# edit prompts
+know-code questions --json                    # agent: read minQuestions + context
+know-code questions --template > .know-code/quiz.json   # agent: starting skeleton
+# agent edits prompts to match the real diff
 know-code quiz validate
-know-code ask
+know-code ask                               # you: answer in browser tab
 ```
+
+`ask` rejects quizzes that are too short, missing ids, or bound to a stale hash.
 
 ## Validation errors
 
-- **Hash mismatch** — re-run `questions` and rewrite quiz for current diff
-- **Too few questions** — add questions until `minQuestions` met
+- **Hash mismatch** — diff changed; agent re-runs `questions` and rewrites the quiz
+- **Too few questions** — agent adds questions until `minQuestions` met
 - **Missing ids** — every question needs `id` + `prompt`
 
-See also: [grading](./grading.md), [levels](./levels.md).
+See also: [Grading](/grading) · [Levels](/levels) · [Tutorial](/tutorial)

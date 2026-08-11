@@ -1,6 +1,6 @@
 # Team onboarding
 
-Each developer has **local** know-code state (`.know-code/` is gitignored).
+Each developer has **local** know-code state (`.know-code/` is gitignored). On a team, every person runs their own attest key and seals their own `taught` / `grade` / `pass` — the agent still writes quizzes and grade proposals; teammates answer and attest individually before pushing.
 
 ## New developer checklist
 
@@ -27,5 +27,5 @@ If CI fails but local push works, check `requireTrailer` — the GitHub Action d
 
 ```bash
 know-code config set requireTrailer true
-know-code doctor
+know-code doctor --strict
 ```

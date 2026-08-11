@@ -5,53 +5,152 @@ title: How it works
 
 # How it works
 
-```text
-attest-init → range begin → teach → taught (seal) → questions → ask
-  → grade (seal) → pass (seal) → commit(s) → range seal → push → CI
+## The problem
+
+Coding agents can produce large diffs fast. It's easy to approve a commit you don't actually understand. know-code adds a deliberate checkpoint: **you must demonstrate comprehension before anything ships**.
+
+## The checkpoint
+
+```mermaid
+flowchart LR
+    A[Code change] --> B[Teach]
+    B --> C[Quiz in browser]
+    C --> D[Grade review]
+    D --> E[pass — gate opens]
+    E --> F[commit]
+    F --> G[push]
+    G --> H[CI verify]
 ```
+
+Nothing in that chain is honor-system:
+
+- The **agent** writes the quiz and proposes your score — it cannot attest `pass` for you.
+- **You** answer in the browser (not chat) and seal receipts with a passphrase only you hold.
+- **Hooks** block commit/push when the gate is closed.
+- **CI** rejects trailers that don't match a computed hash of the real diff.
+
+## Who does what
+
+| Phase | Agent | You (human) |
+|-------|-------|-------------|
+| Start batch | — | `range begin`, `attest-init` (once) |
+| Teach | Explains via `know-code-teach` skill | `taught` (seal) |
+| Quiz | `questions`, write `quiz.json`, `quiz validate`, `ask` | Answer in **browser** |
+| Grade | Write `grade-proposal.json` | `grade --review`, `pass` (seal) |
+| Stage | — (denied in agent hooks) | `git add` in your terminal |
+| Commit | `git commit` after gate opens | Or you run it yourself |
+| Finish batch | — | `range seal --rewrite`, `git push` |
+
+Commands that need your passphrase (`taught`, `grade`, `pass`, `range seal`) always run in **your** terminal — never from the agent.
+
+## One quiz per range
+
+`know-code range begin` pins a merge-base. **One quiz + one `pass`** covers every commit until `range seal` — you do not re-quiz per commit.
+
+```mermaid
+flowchart LR
+    A[range begin] --> B[teach + quiz + pass]
+    B --> C[git add + git commit × N]
+    C --> D[range seal --rewrite]
+    D --> E[push]
+```
+
+Typical batch:
+
+1. Agent implements the feature (you may `git add` slices as you go).
+2. You quiz **once** on the cumulative diff and `pass`.
+3. Agent lands logical commits with **plain `git commit`** while the gate is open.
+4. You `range seal --rewrite` to stamp `Know-Code-Verified` on every commit, then push.
+
+**Commit drift:** after `pass`, the range hash moves as commits land, but the gate stays open while the tree matches `gatedTreeOid` from pass time. That's what makes multi-commit batches work without re-quizzing.
+
+Single-commit hotfix? Skip `range begin` — the hash covers the staged index only. See [Workflows](/workflows).
+
+## What blocks commit and push
+
+```mermaid
+flowchart TB
+    subgraph layers["Defense layers (in order)"]
+        direction TB
+        A["Agent shell hooks<br/>deny git add, amend, merge, bypasses"]
+        G["Git pre-commit / pre-push<br/>know-code check"]
+        C["CI know-code verify<br/>grounded trailer hash"]
+    end
+    A --> G --> C
+```
+
+| Layer | When it runs | What it checks |
+|-------|--------------|----------------|
+| **Agent shell hooks** | Agent tries `git commit`, `git add`, `git merge`, … | Deny bypass patterns; run `know-code check` for allowed paths |
+| **Git pre-commit** | Any `git commit` / `know-code commit` | Gate open, trailer grounded, tree matches `gatedTreeOid` |
+| **Git pre-push** | `git push` | Trailer on HEAD, tree still matches gate |
+| **CI `verify`** | Pull request / push to main | `Know-Code-Verified` hash matches computed diff |
+
+If commit is blocked after you passed, run `know-code status` — usually the diff changed (new edits, unstaged files, or legacy gate without `gatedTreeOid`).
 
 ## Hash scope
 
+The quiz always binds to a **hash of the diff** you're about to ship.
+
 | Mode | When | Hash covers |
 |------|------|-------------|
-| **Index** | `rangeMode: index`, or `auto` without active session | Empty-tree → current index (staged + HEAD tree) |
-| **Range** | `range begin` active, or `rangeMode: range` | Cumulative diff `fromOid...HEAD` + staged |
+| **Index** | No active range session (or `rangeMode: index`) | Empty tree → current index (staged + HEAD tree) |
+| **Range** | `range begin` active (or `rangeMode: range`) | Cumulative diff from merge-base through HEAD + staged |
 
-Use `know-code hash` and `know-code config --json` to see the active scope.
+```bash
+know-code hash
+know-code config --json    # shows active scope
+```
 
-## Range mode
+## passHash, tipHash, and trailers
 
-`know-code range begin` pins merge-base. **One quiz** covers every commit until `range seal`.
+| Name | Meaning |
+|------|---------|
+| **passHash** | Diff hash stored in `gate.json` when you ran `pass` |
+| **tipHash** | Current `know-code hash` (may differ after commits) |
+| **trailerHash** | Value in `Know-Code-Verified:` on commit messages |
 
-| `rangeSeal` | Behavior |
-|-------------|----------|
-| `receipt` (default) | Signed `.know-code/range-seal.json`; HEAD should carry trailer for CI |
-| `rewrite` | `range seal --rewrite` stamps `Know-Code-Verified: <hash>` on every commit in range (`git push --force-with-lease`) |
+**Commit drift:** after `pass`, the agent may land several commits. `tipHash` moves with each commit, but the **tree** can stay the same. The gate stays open via `gatedTreeOid` (tree OID recorded at pass) until you change staged content or the working tree.
 
-After `range seal --rewrite`, `check` allows push when the sealed range + gate match. CI uses default `know-code verify`, which accepts a range-hash trailer on HEAD even when the index hash differs — no rewrite required for squash workflows.
+```mermaid
+flowchart LR
+    subgraph pass["At pass"]
+        P[passHash + gatedTreeOid]
+    end
+    subgraph commits["After commits"]
+        C1[commit 1]
+        C2[commit 2]
+        C3[commit N]
+    end
+    subgraph seal["Range seal"]
+        S[tipHash on all commits]
+    end
+    P --> C1 --> C2 --> C3 --> S
+```
 
-Use `verify --require-range-trailers` only when every commit in a batch must carry the same trailer (strict, non-squash teams).
+**Range seal:** `range seal --rewrite` stamps the final **tipHash** on every commit in the batch so CI can verify the whole range. Use `verify --require-range-trailers` only when every commit must carry a trailer.
 
 ## Attestation
 
-`attest-init` creates a passphrase key under `~/.know-code/attest/<repoId>/`. Public key lives in `meta.json` beside the encrypted private key — **not** in repo config.
+`attest-init` creates a passphrase-encrypted Ed25519 key under `~/.know-code/attest/<repoId>/`.
 
-`taught`, `grade`, `pass`, and `range seal` produce Ed25519 signatures agents cannot forge without the passphrase.
+Signed artifacts: `taught.json`, `grade.json`, `gate.json`, `range-seal.json`. Agents can read them but cannot forge signatures without your passphrase.
 
 ## Question quota
 
-`know-code questions` computes the minimum quiz size from level, lines/files changed, commit count, languages, and sensitive paths. `ask` rejects under-sized quizzes.
+`know-code questions` sets the minimum quiz size from level, diff size, languages, and sensitive paths. The agent must meet that bar; `ask` rejects under-sized quizzes.
 
 ## Configuration
 
-See the dedicated [Configuration](/config) page for all fields, defaults, env overrides, and examples.
-
-Quick summary:
-
 - `~/.know-code/config.json` — optional user defaults
-- `.know-code/config.json` — local repo settings (gitignored; from `know-code init`)
+- `.know-code/config.json` — per-repo settings (gitignored; from `init`)
 - `know-code config` — effective merged settings
 
-## Git hooks
+Full reference: [Configuration](/config). Notable default since 0.3.0: `enforcePipeline: true` (teach + quiz required before pass).
 
-Pre-commit and pre-push run `know-code check`. In this monorepo, hooks prefer `packages/cli/dist/index.js` over a global `know-code` on PATH so dogfooding uses the built CLI.
+## Hooks (summary)
+
+- **Git:** pre-commit / pre-push → `know-code check`
+- **Agent:** deny `git add`, amend, merge/pull/rebase, hook bypasses; gate `know-code commit` and `git push`
+
+Details: [Hooks](/hooks)

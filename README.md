@@ -1,23 +1,21 @@
 # k(no)w-code
 
-**Your agents don’t push until you know exactly what’s changed.**
+**Your agents don't push until you know exactly what's changed.**
 
-Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commit`, `git push`, and PR creation until the **human** passes a comprehension quiz about the diff. **Agent-proposed grading** with human review — not self-scored. Works with Claude Code, Cursor, Codex, and plain terminals.
+Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commit`, `git push`, and PR creation until **you** pass a comprehension quiz about the diff. The agent writes the quiz and proposes your grade — **you** answer in the browser and seal the gate. Not self-scored.
 
 **Docs:** [kc.chtnnhfoundation.org](https://kc.chtnnhfoundation.org)
 
-## How it works
+## Who does what
 
-1. **Attest key** — `know-code attest-init` once (passphrase-encrypted Ed25519).
-2. **Range session** — `know-code range begin` for multi-commit batches.
-3. **Question quota** — `know-code questions` before writing the quiz.
-4. **Agent grades** — writes `grade-proposal.json` after browser `ask`.
-5. **Human reviews** — `grade --review` → `pass` → `commit` → `range seal` → push.
-
-```text
-attest-init → range begin → taught → questions → ask → grade propose → grade --review → pass
-  → commit(s) → range seal → push
-```
+| | Agent | You (human) |
+|---|-------|-------------|
+| Teach | Explains the change | `taught` (seal) |
+| Quiz | Writes `quiz.json`, runs `ask` | Answer in **browser** |
+| Grade | `grade-proposal.json` | `grade --review` → `pass` |
+| Stage | — (denied in agent hooks) | `git add` |
+| Commit | `know-code commit` | Or you, after pass |
+| Ship | — | `range seal`, `git push` |
 
 ## Install
 
@@ -29,31 +27,25 @@ know-code skills
 know-code range begin
 ```
 
-## CLI highlights
+## The loop
+
+```text
+range begin → [agent teaches] → taught → [agent: quiz] → ask → [you: browser]
+  → [agent: grade proposal] → grade --review → pass → [agent: commit(s)] → range seal → push
+```
 
 | Phase | Command | Who |
 |-------|---------|-----|
-| Debug | `know-code doctor` · `status --json` | either |
-| Start range | `know-code range begin` | human |
-| Question quota | `know-code questions --template` | agent |
-| Validate quiz | `know-code quiz validate` | agent |
-| Teach receipt | `know-code taught` | human |
-| Quiz | `know-code ask` | human (browser) |
-| Grade proposal | agent writes `grade-proposal.json` | agent |
-| Review + pass | `know-code grade --review` · `pass` | human |
-| Ship checklist | `know-code ship` | human |
-| Commit | `know-code commit -m "…"` or `-F file` | human |
-| Finish range | `know-code range seal` | human |
+| Debug | `status --json` · `doctor --strict` | either |
+| Start range | `range begin` | you |
+| Teach receipt | `taught` | you |
+| Quiz authoring | `questions` · `quiz.json` · `quiz validate` | agent |
+| Quiz answers | `ask` | you (browser) |
+| Grade | `grade-proposal.json` → `grade --review` · `pass` | agent → you |
+| Commit | `know-code commit -m "…"` | agent |
+| Finish | `range seal` · `ship` · `git push` | you |
 
-**Human review** (after agent grading proposal):
-
-```bash
-know-code grade --review
-know-code pass
-know-code commit -m "feat: …"
-```
-
-See [grading docs](https://kc.chtnnhfoundation.org/docs/grading) and [tutorial](https://kc.chtnnhfoundation.org/docs/tutorial).
+Walkthrough: [tutorial](https://kc.chtnnhfoundation.org/docs/tutorial) · Mechanics: [how it works](https://kc.chtnnhfoundation.org/docs/how-it-works)
 
 ## Author
 
