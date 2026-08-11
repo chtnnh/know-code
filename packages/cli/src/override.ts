@@ -14,6 +14,7 @@ import {
   overrideAllowPath,
   overrideLogPath,
 } from "./paths.js";
+import { assertSigned, sealPayload } from "./seal.js";
 
 export const OVERRIDE_TTL_MS = 10 * 60 * 1000;
 
@@ -21,6 +22,8 @@ export interface OverrideAllow {
   version: 1;
   createdAt: string;
   expiresAt: string;
+  keyId?: string;
+  sig?: string;
 }
 
 /** Agent shell hooks set KNOW_CODE_HOOK_FORMAT; CI sets CI=true. */
@@ -49,19 +52,68 @@ export function readOverrideAllow(repoRoot: string): OverrideAllow | null {
   }
 }
 
+/**
+ * Fresh TTL + human Ed25519 seal. Unsigned agent-minted files never count —
+ * same threat model as forgeable .commit-in-progress tokens.
+ */
 export function hasValidOverrideAllow(repoRoot: string): boolean {
   const allow = readOverrideAllow(repoRoot);
   if (!allow) return false;
-  return Date.parse(allow.expiresAt) > Date.now();
+  if (Date.parse(allow.expiresAt) <= Date.now()) return false;
+  if (!allow.sig || !allow.keyId) return false;
+  try {
+    assertSigned(
+      repoRoot,
+      "override-allow.json",
+      allow as unknown as Record<string, unknown> & {
+        sig?: string;
+        keyId?: string;
+      },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-export function writeOverrideAllow(repoRoot: string): OverrideAllow {
+/** @internal unsigned writer — does not authorize OVERRIDE (tests only). */
+export function writeUnsignedOverrideAllow(repoRoot: string): OverrideAllow {
   mkdirSync(knowCodeDir(repoRoot), { recursive: true });
   const createdAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + OVERRIDE_TTL_MS).toISOString();
   const allow: OverrideAllow = { version: 1, createdAt, expiresAt };
   writeFileSync(overrideAllowPath(repoRoot), `${JSON.stringify(allow, null, 2)}\n`);
   return allow;
+}
+
+/** Human-sealed override allowance (passphrase / TTY). */
+export async function writeSealedOverrideAllow(
+  repoRoot: string,
+  opts?: { passphrase?: string },
+): Promise<OverrideAllow> {
+  mkdirSync(knowCodeDir(repoRoot), { recursive: true });
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + OVERRIDE_TTL_MS).toISOString();
+  const unsigned: Omit<OverrideAllow, "keyId" | "sig"> = {
+    version: 1,
+    createdAt,
+    expiresAt,
+  };
+  const sealed = (await sealPayload(
+    repoRoot,
+    unsigned as unknown as Record<string, unknown>,
+    { passphrase: opts?.passphrase },
+  )) as unknown as OverrideAllow;
+  writeFileSync(
+    overrideAllowPath(repoRoot),
+    `${JSON.stringify(sealed, null, 2)}\n`,
+  );
+  return sealed;
+}
+
+/** @deprecated use writeSealedOverrideAllow — unsigned files are not valid. */
+export function writeOverrideAllow(repoRoot: string): OverrideAllow {
+  return writeUnsignedOverrideAllow(repoRoot);
 }
 
 export function consumeOverrideAllow(repoRoot: string): void {
@@ -71,10 +123,16 @@ export function consumeOverrideAllow(repoRoot: string): void {
 
 /**
  * If KNOW_CODE_OVERRIDE=1, decide whether bypass is allowed.
- * Env alone is never enough — needs a fresh override-allow from `know-code override`.
- * Denied in agent hooks and CI.
+ * Env alone is never enough — needs a fresh sealed override-allow from
+ * `know-code override`. Denied in agent hooks and CI.
+ *
+ * `consume` defaults true (check/hook). `know-code commit` peeks during entry
+ * then consumes override-allow after a successful commit (not via pre-commit).
  */
-export function tryOverrideBypass(repoRoot: string): {
+export function tryOverrideBypass(
+  repoRoot: string,
+  opts: { consume?: boolean } = {},
+): {
   allowed: boolean;
   reason?: string;
 } {
@@ -95,19 +153,23 @@ export function tryOverrideBypass(repoRoot: string): {
   }
 
   if (!hasValidOverrideAllow(repoRoot)) {
-    logOverride(repoRoot, "denied OVERRIDE without override-allow.json");
+    logOverride(repoRoot, "denied OVERRIDE without sealed override-allow.json");
     return {
       allowed: false,
       reason:
-        "know-code: OVERRIDE requires a prior TTY confirmation.\n" +
+        "know-code: OVERRIDE requires a prior TTY confirmation with attest seal.\n" +
         "  Run: know-code override\n" +
         "  Then: KNOW_CODE_OVERRIDE=1 <command>\n" +
         "  (allowance lasts 10 minutes, one successful check consumes it)",
     };
   }
 
-  consumeOverrideAllow(repoRoot);
-  logOverride(repoRoot, "allowed OVERRIDE (consumed override-allow)");
+  if (opts.consume !== false) {
+    consumeOverrideAllow(repoRoot);
+    logOverride(repoRoot, "allowed OVERRIDE (consumed sealed override-allow)");
+  } else {
+    logOverride(repoRoot, "allowed OVERRIDE (peek; not consumed)");
+  }
   return { allowed: true };
 }
 
@@ -121,7 +183,7 @@ function promptLine(question: string): Promise<string> {
   });
 }
 
-/** Interactive: write a short-lived one-shot override allowance. */
+/** Interactive: write a short-lived one-shot sealed override allowance. */
 export async function cmdOverride(): Promise<void> {
   const repoRoot = findGitRoot();
 
@@ -151,10 +213,15 @@ export async function cmdOverride(): Promise<void> {
     process.exit(1);
   }
 
-  const allow = writeOverrideAllow(repoRoot);
-  logOverride(repoRoot, "created override-allow via TTY");
-  console.error(`know-code: override allowed until ${allow.expiresAt}`);
-  console.error(
-    "know-code: next: KNOW_CODE_OVERRIDE=1 git commit|push  (or know-code commit)",
-  );
+  try {
+    const allow = await writeSealedOverrideAllow(repoRoot);
+    logOverride(repoRoot, "created sealed override-allow via TTY");
+    console.error(`know-code: override allowed until ${allow.expiresAt}`);
+    console.error(
+      "know-code: next: KNOW_CODE_OVERRIDE=1 git commit|push  (or know-code commit)",
+    );
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
 }

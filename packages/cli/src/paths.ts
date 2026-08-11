@@ -58,6 +58,10 @@ export function rangeSealPath(repoRoot: string): string {
   return join(knowCodeDir(repoRoot), "range-seal.json");
 }
 
+export function sealedHeadBindingPath(repoRoot: string): string {
+  return join(knowCodeDir(repoRoot), "sealed-head-binding.json");
+}
+
 export function overrideAllowPath(repoRoot: string): string {
   return join(knowCodeDir(repoRoot), "override-allow.json");
 }

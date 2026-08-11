@@ -27,7 +27,8 @@ import {
   hasValidOverrideAllow,
   isRestrictedOverrideContext,
   tryOverrideBypass,
-  writeOverrideAllow,
+  writeSealedOverrideAllow,
+  writeUnsignedOverrideAllow,
 } from "./override.js";
 import { initAttestKey, signPayload } from "./seal.js";
 import { DEFAULT_CONFIG } from "./types.js";
@@ -143,18 +144,28 @@ describe("attest prerequisites", () => {
 
 describe("override policy", () => {
   let dir: string;
+  let attestHome: string;
+  const passphrase = "override-test-passphrase";
   const keys = [
     "KNOW_CODE_OVERRIDE",
     "KNOW_CODE_HOOK_FORMAT",
     "CI",
     "GITHUB_ACTIONS",
+    "KNOW_CODE_ATTEST_HOME",
+    "KNOW_CODE_ATTEST_PASSPHRASE",
   ] as const;
   const prev: Record<string, string | undefined> = {};
 
   before(() => {
     for (const k of keys) prev[k] = process.env[k];
+    delete process.env.KNOW_CODE_HOOK_FORMAT;
+    attestHome = mkdtempSync(join(tmpdir(), "kc-ovr-att-"));
+    process.env.KNOW_CODE_ATTEST_HOME = attestHome;
+    process.env.KNOW_CODE_ATTEST_PASSPHRASE = passphrase;
     dir = mkdtempSync(join(tmpdir(), "override-"));
     mkdirSync(join(dir, ".know-code"), { recursive: true });
+    writeConfig(dir, { ...DEFAULT_CONFIG, level: "lite", requireAttest: true });
+    initAttestKey(dir, passphrase);
   });
 
   after(() => {
@@ -163,15 +174,18 @@ describe("override policy", () => {
       else process.env[k] = prev[k];
     }
     rmSync(dir, { recursive: true, force: true });
+    rmSync(attestHome, { recursive: true, force: true });
   });
 
-  it("denies OVERRIDE in agent-hook context", () => {
-    process.env.KNOW_CODE_OVERRIDE = "1";
-    process.env.KNOW_CODE_HOOK_FORMAT = "cursor";
+  it("denies OVERRIDE in agent-hook context", async () => {
+    delete process.env.KNOW_CODE_HOOK_FORMAT;
     delete process.env.CI;
     delete process.env.GITHUB_ACTIONS;
+    // Seal while not in agent context (sealing requires human TTY path).
+    await writeSealedOverrideAllow(dir, { passphrase });
+    process.env.KNOW_CODE_OVERRIDE = "1";
+    process.env.KNOW_CODE_HOOK_FORMAT = "cursor";
     assert.equal(isRestrictedOverrideContext(), true);
-    writeOverrideAllow(dir);
     const r = tryOverrideBypass(dir);
     assert.equal(r.allowed, false);
     assert.match(r.reason || "", /denied in agent hooks/);
@@ -189,12 +203,23 @@ describe("override policy", () => {
     assert.match(r.reason || "", /know-code override/);
   });
 
-  it("allows then consumes override-allow", () => {
+  it("denies agent-minted unsigned override-allow", () => {
     process.env.KNOW_CODE_OVERRIDE = "1";
     delete process.env.KNOW_CODE_HOOK_FORMAT;
     delete process.env.CI;
     delete process.env.GITHUB_ACTIONS;
-    writeOverrideAllow(dir);
+    writeUnsignedOverrideAllow(dir);
+    assert.equal(hasValidOverrideAllow(dir), false);
+    const r = tryOverrideBypass(dir);
+    assert.equal(r.allowed, false);
+  });
+
+  it("allows then consumes sealed override-allow", async () => {
+    process.env.KNOW_CODE_OVERRIDE = "1";
+    delete process.env.KNOW_CODE_HOOK_FORMAT;
+    delete process.env.CI;
+    delete process.env.GITHUB_ACTIONS;
+    await writeSealedOverrideAllow(dir, { passphrase });
     assert.equal(hasValidOverrideAllow(dir), true);
     const r = tryOverrideBypass(dir);
     assert.equal(r.allowed, true);

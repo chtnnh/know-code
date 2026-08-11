@@ -20,6 +20,8 @@ import {
 import { runCheck } from "./commands/check.js";
 import { writeConfig } from "./config.js";
 import {
+  isSignedGateEffective,
+  isSignedGateOpen,
   materializedTreeOid,
   readGate,
   resolveEffectiveQuizState,
@@ -172,6 +174,128 @@ describe("gate survives commit when tree unchanged (range drift)", () => {
     assert.equal(drift.commitDrift, true);
     assert.equal(drift.effectiveHash, hash);
     assert.equal(readGate(repoRoot)!.gatedTreeOid, gatedTreeOid);
+    assert.equal(runCheck(repoRoot).allowed, true);
+
+    const cfg = { ...DEFAULT_CONFIG, level: "lite" as const, rangeMode: "range" as const };
+    assert.equal(
+      isSignedGateOpen(repoRoot, readGate(repoRoot), afterCommit.diffHash, "lite"),
+      false,
+    );
+    assert.equal(
+      isSignedGateEffective(repoRoot, readGate(repoRoot), drift, "lite"),
+      true,
+    );
+  });
+
+  it("keeps gate open across pathspec slice commits (remaining staged)", () => {
+    const fromOid = git(repoRoot, ["rev-parse", "HEAD"]);
+    writeRangeSession(repoRoot, {
+      version: 1,
+      fromOid,
+      fromRef: fromOid,
+      startedAt: new Date().toISOString(),
+      startHead: fromOid,
+    });
+
+    writeFileSync(join(repoRoot, "slice-a.txt"), "a\n");
+    writeFileSync(join(repoRoot, "slice-b.txt"), "b\n");
+    git(repoRoot, ["add", "slice-a.txt", "slice-b.txt"]);
+
+    const stagedCtx = computeRangeDiffContext(
+      repoRoot,
+      { ...DEFAULT_CONFIG, rangeMode: "range" },
+      fromOid,
+    );
+    const hash = stagedCtx.diffHash;
+    const gatedTreeOid = materializedTreeOid(repoRoot);
+
+    writeAnswers(repoRoot, {
+      diffHash: hash,
+      level: "lite",
+      answers: [{ id: "q1", answer: "sliced batch" }],
+    });
+    const digest = answersDigest({
+      diffHash: hash,
+      answers: [{ id: "q1", answer: "sliced batch" }],
+    });
+
+    const taughtUnsigned: Omit<TaughtReceipt, "keyId" | "sig"> = {
+      version: 1,
+      diffHash: hash,
+      taughtAt: new Date().toISOString(),
+      skipped: false,
+    };
+    const t = signPayload(
+      repoRoot,
+      passphrase,
+      taughtUnsigned as unknown as Record<string, unknown>,
+    );
+    writeTaught(repoRoot, { ...taughtUnsigned, ...t });
+
+    const gradeUnsigned: Omit<GradeReceipt, "keyId" | "sig"> = {
+      version: 1,
+      diffHash: hash,
+      score: 1,
+      passed: true,
+      gradedAt: new Date().toISOString(),
+      level: "lite",
+      answersDigest: digest,
+    };
+    const g = signPayload(
+      repoRoot,
+      passphrase,
+      gradeUnsigned as unknown as Record<string, unknown>,
+    );
+    writeGrade(repoRoot, { ...gradeUnsigned, ...g });
+
+    const gateUnsigned: Omit<GateReceipt, "keyId" | "sig"> = {
+      version: 1,
+      diffHash: hash,
+      level: "lite",
+      passedAt: new Date().toISOString(),
+      commitRange: stagedCtx.commitRange,
+      baseRef: stagedCtx.baseRef,
+      headRef: stagedCtx.headRef,
+      scope: "range",
+      rangeFromOid: fromOid,
+      commitCount: stagedCtx.commitCount,
+      answersDigest: digest,
+      gatedTreeOid,
+    };
+    const sealed = signPayload(
+      repoRoot,
+      passphrase,
+      gateUnsigned as unknown as Record<string, unknown>,
+    );
+    writeGate(repoRoot, { ...gateUnsigned, ...sealed });
+
+    // Pathspec commit slice 1 — remaining staged content stays in index.
+    git(repoRoot, [
+      "commit",
+      "-m",
+      `feat: slice a\n\nKnow-Code-Verified: ${hash}\n`,
+      "--",
+      "slice-a.txt",
+    ]);
+
+    assert.equal(materializedTreeOid(repoRoot), gatedTreeOid);
+    const mid = resolveEffectiveQuizState(repoRoot);
+    assert.equal(mid.commitDrift, true);
+    assert.equal(mid.effectiveHash, hash);
+    assert.equal(runCheck(repoRoot).allowed, true);
+
+    // Commit the rest.
+    git(repoRoot, [
+      "commit",
+      "-m",
+      `feat: slice b\n\nKnow-Code-Verified: ${hash}\n`,
+      "--",
+      "slice-b.txt",
+    ]);
+
+    assert.equal(materializedTreeOid(repoRoot), gatedTreeOid);
+    const done = resolveEffectiveQuizState(repoRoot);
+    assert.equal(done.commitDrift, true);
     assert.equal(runCheck(repoRoot).allowed, true);
   });
 });

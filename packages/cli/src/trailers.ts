@@ -13,6 +13,17 @@ export function trailerHashFromMessage(message: string): string | null {
   return m ? m[1].toLowerCase() : null;
 }
 
+export function headHasTrailer(
+  repoRoot: string,
+  headRef: string,
+  hash: string,
+): boolean {
+  const headMsg = git(["log", "-1", "--format=%B", headRef], repoRoot, {
+    allowFail: true,
+  });
+  return new RegExp(`^Know-Code-Verified:\\s*${hash}\\s*$`, "im").test(headMsg);
+}
+
 /** When every commit in fromOid..HEAD carries the same trailer hash, return it. */
 export function inferUniformRangeTrailerHash(
   repoRoot: string,
