@@ -89,7 +89,24 @@ node --input-type=module -e "
 node "$KC" grade --accept --hash "$HASH" --level lite --passphrase "$KNOW_CODE_ATTEST_PASSPHRASE"
 node "$KC" pass --level lite --hash "$HASH" --passphrase "$KNOW_CODE_ATTEST_PASSPHRASE"
 node "$KC" check
+
+# Stamp grounded trailer on HEAD (range seal requires it); use know-code amend.
+node "$KC" amend -m "feat: smoke feature"
+
+# 0.3.0: unstaged edit must close gate (E01) before seal
+echo "evil" >> README.md
+set +e
+node "$KC" check
+unstaged=$?
+set -e
+test "$unstaged" -eq 2
+git checkout -- README.md
+node "$KC" check
+
 node "$KC" range seal
+
+# doctor --strict may fail without agent hooks in smoke repo — non-strict ok
+node "$KC" doctor --json >/dev/null
 
 set +e
 KNOW_CODE_HOOK_FORMAT=cursor node "$KC" taught --skip
