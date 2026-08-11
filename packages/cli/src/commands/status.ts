@@ -1,14 +1,48 @@
 import { readAnswers, readGrade, readTaught } from "../attest.js";
 import { readConfig } from "../config.js";
 import { runCheck } from "./check.js";
-import { readGate, resolveEffectiveQuizState } from "../gate.js";
+import { resolveEffectiveQuizState } from "../enforcement.js";
+import { readGateSafe } from "../gate.js";
 import { readGradeProposal } from "../grading.js";
 import { evaluatePipeline } from "../pipeline.js";
 import { readRangeSession } from "../range.js";
-import { diffStat, logOneline, mergeBase } from "../git.js";
+import {
+  diffStat,
+  hasUnstagedTrackedChanges,
+  logOneline,
+  mergeBase,
+} from "../git.js";
 import { hasValidOverrideAllow } from "../override.js";
 import { findGitRoot } from "../paths.js";
 import { readAttestMeta, verifyPayload } from "../seal.js";
+
+function shortHash(h: string | undefined | null): string {
+  return h && h.length >= 12 ? `${h.slice(0, 12)}…` : h || "(none)";
+}
+
+function staleCause(
+  artifactHash: string | undefined,
+  currentHash: string,
+  unstaged: boolean,
+): string {
+  if (!artifactHash) return "missing";
+  if (artifactHash === currentHash) return "ok";
+  if (unstaged) {
+    return `stale ${shortHash(artifactHash)} vs ${shortHash(currentHash)} (unstaged edits present — git add or stash)`;
+  }
+  return `stale ${shortHash(artifactHash)} vs ${shortHash(currentHash)} (staging/range changed since artifact)`;
+}
+
+function safeRead<T>(fn: () => T | null): {
+  value: T | null;
+  corrupt: boolean;
+} {
+  try {
+    return { value: fn(), corrupt: false };
+  } catch {
+    return { value: null, corrupt: true };
+  }
+}
 
 export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   const repoRoot = findGitRoot();
@@ -18,14 +52,19 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     config,
   );
   const session = readRangeSession(repoRoot);
-  const receipt = readGate(repoRoot);
+  const receipt = readGateSafe(repoRoot);
   const allowed = runCheck(repoRoot).allowed;
   const from = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
   const stat = diffStat(repoRoot, from, ctx.headRef);
   const log = logOneline(repoRoot, from, ctx.headRef);
-  const taught = readTaught(repoRoot);
-  const answers = readAnswers(repoRoot);
-  const grade = readGrade(repoRoot);
+  const taughtR = safeRead(() => readTaught(repoRoot));
+  const answersR = safeRead(() => readAnswers(repoRoot));
+  const gradeR = safeRead(() => readGrade(repoRoot));
+  const proposalR = safeRead(() => readGradeProposal(repoRoot));
+  const taught = taughtR.value;
+  const answers = answersR.value;
+  const grade = gradeR.value;
+  const proposal = proposalR.value;
   const meta = readAttestMeta(repoRoot);
   const pub = meta?.pubKey;
   const taughtOk =
@@ -39,8 +78,20 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     !!pub &&
     verifyPayload(pub, grade as unknown as Record<string, unknown> & { sig?: string; keyId?: string });
 
-  const proposal = readGradeProposal(repoRoot);
   const pipeline = evaluatePipeline(repoRoot);
+  const unstaged = hasUnstagedTrackedChanges(repoRoot);
+  const taughtStaleDetail = taughtR.corrupt
+    ? "corrupt"
+    : staleCause(taught?.diffHash, effectiveHash, unstaged);
+  const answersStaleDetail = answersR.corrupt
+    ? "corrupt"
+    : staleCause(answers?.diffHash, effectiveHash, unstaged);
+  const gradeStaleDetail = gradeR.corrupt
+    ? "corrupt"
+    : staleCause(grade?.diffHash, effectiveHash, unstaged);
+  const proposalStaleDetail = proposalR.corrupt
+    ? "corrupt"
+    : staleCause(proposal?.diffHash, effectiveHash, unstaged);
 
   const payload = {
     allowed,
@@ -53,6 +104,7 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     diffHash: ctx.diffHash,
     effectiveHash: commitDrift ? effectiveHash : undefined,
     commitDrift,
+    unstagedTrackedEdits: unstaged,
     scope: ctx.scope,
     commitCount: ctx.commitCount,
     rangeActive: !!session,
@@ -60,12 +112,30 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     headRef: ctx.headRef,
     commitRange: ctx.commitRange,
     receipt,
-    taught: taught?.diffHash === effectiveHash ? taught : null,
+    taught: taughtR.corrupt
+      ? "corrupt"
+      : taught?.diffHash === effectiveHash
+        ? taught
+        : null,
     taughtSealed: taughtOk,
-    answers: answers?.diffHash === effectiveHash,
-    grade: grade?.diffHash === effectiveHash ? grade : null,
+    taughtDetail: taughtStaleDetail,
+    answers: answersR.corrupt
+      ? "corrupt"
+      : answers?.diffHash === effectiveHash,
+    answersDetail: answersStaleDetail,
+    grade: gradeR.corrupt
+      ? "corrupt"
+      : grade?.diffHash === effectiveHash
+        ? grade
+        : null,
     gradeSealed: gradeOk,
-    gradeProposal: proposal?.diffHash === effectiveHash ? true : false,
+    gradeDetail: gradeStaleDetail,
+    gradeProposal: proposalR.corrupt
+      ? "corrupt"
+      : proposal?.diffHash === effectiveHash
+        ? true
+        : false,
+    gradeProposalDetail: proposalStaleDetail,
     overrideEnv: process.env.KNOW_CODE_OVERRIDE === "1",
     overrideAllow: hasValidOverrideAllow(repoRoot),
     diffStat: stat,
@@ -110,24 +180,45 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   }
   console.log(
     `  taught:       ${
-      taught?.diffHash === effectiveHash
-        ? `${taught.skipped ? "skipped" : "yes"} sealed=${taughtOk ? "yes" : "no"}`
-        : "no"
+      taughtR.corrupt
+        ? "corrupt"
+        : taught?.diffHash === effectiveHash
+          ? `${taught.skipped ? "skipped" : "yes"} sealed=${taughtOk ? "yes" : "no"}`
+          : taughtStaleDetail
     }`,
   );
   console.log(
-    `  answers:      ${answers?.diffHash === effectiveHash ? "yes" : "no"}`,
+    `  answers:      ${
+      answersR.corrupt
+        ? "corrupt"
+        : answers?.diffHash === effectiveHash
+          ? "yes"
+          : answersStaleDetail
+    }`,
   );
   console.log(
     `  grade:        ${
-      grade?.diffHash === effectiveHash
-        ? `${grade.score} (${grade.passed ? "pass" : "fail"}) sealed=${gradeOk ? "yes" : "no"}`
-        : "no"
+      gradeR.corrupt
+        ? "corrupt"
+        : grade?.diffHash === effectiveHash
+          ? `${grade.score} (${grade.passed ? "pass" : "fail"}) sealed=${gradeOk ? "yes" : "no"}`
+          : gradeStaleDetail
     }`,
   );
   console.log(
-    `  grade-proposal: ${proposal?.diffHash === effectiveHash ? "yes" : "no"}`,
+    `  grade-proposal: ${
+      proposalR.corrupt
+        ? "corrupt"
+        : proposal?.diffHash === effectiveHash
+          ? "yes"
+          : proposalStaleDetail
+    }`,
   );
+  if (unstaged) {
+    console.log(
+      `  unstaged:     yes — close the gate; git add or stash (know-code hash --explain)`,
+    );
+  }
   if (process.env.KNOW_CODE_OVERRIDE === "1" || hasValidOverrideAllow(repoRoot)) {
     console.log(
       `  override:     env=${process.env.KNOW_CODE_OVERRIDE === "1"} allow=${hasValidOverrideAllow(repoRoot)}`,

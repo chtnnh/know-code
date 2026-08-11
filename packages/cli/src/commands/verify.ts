@@ -10,10 +10,11 @@ import {
 import { assertSigned } from "../seal.js";
 import {
   collectVerifyHashCandidates,
-  headHasTrailer,
   matchHeadTrailer,
   primaryVerifyCandidate,
+  type VerifyHashCandidate,
 } from "../verify-helpers.js";
+import type { QuizContext } from "../types.js";
 
 function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   const commits = git(["rev-list", "--reverse", `${from}..${to}`], repoRoot, {
@@ -33,22 +34,36 @@ function trailersInRange(repoRoot: string, from: string, to: string): string[] {
   return found;
 }
 
-export function cmdVerify(opts: {
-  requireAll?: boolean;
-  requireRangeTrailers?: boolean;
-  rangeSeal?: boolean;
-}): void {
-  const repoRoot = findGitRoot();
+export interface VerifyResult {
+  ok: boolean;
+  exitCode: number;
+  messages: string[];
+  errors: string[];
+  primary?: VerifyHashCandidate;
+  matched?: VerifyHashCandidate | { label: string };
+  ctx?: QuizContext;
+}
+
+export function runVerify(
+  repoRoot: string,
+  opts: {
+    requireAll?: boolean;
+    requireRangeTrailers?: boolean;
+    rangeSeal?: boolean;
+  } = {},
+): VerifyResult {
   const config = readConfig(repoRoot);
   const ctx = resolveQuizContext(repoRoot, config);
   const candidates = collectVerifyHashCandidates(repoRoot, config);
   const primary = primaryVerifyCandidate(candidates);
+  const messages: string[] = [];
+  const errors: string[] = [];
 
   if (opts.rangeSeal) {
     const seal = readRangeSeal(repoRoot);
     if (!seal) {
-      console.error("know-code: no range-seal.json");
-      process.exit(1);
+      errors.push("know-code: no range-seal.json");
+      return { ok: false, exitCode: 1, messages, errors, primary, ctx };
     }
     try {
       assertSigned(
@@ -59,57 +74,84 @@ export function cmdVerify(opts: {
           keyId?: string;
         },
       );
-      console.log(
+      messages.push(
         `know-code: range seal valid (${seal.sealMode}, hash ${seal.diffHash.slice(0, 12)}…)`,
       );
-      process.exit(0);
+      return { ok: true, exitCode: 0, messages, errors, primary, ctx };
     } catch (err) {
-      console.error(err instanceof Error ? err.message : err);
-      process.exit(1);
+      errors.push(err instanceof Error ? err.message : String(err));
+      return { ok: false, exitCode: 1, messages, errors, primary, ctx };
     }
   }
 
-  console.log(`know-code verify`);
-  console.log(`  expected: ${primary.hash} (${primary.label})`);
-  console.log(`  scope:    ${ctx.scope}`);
-  console.log(`  range:    ${ctx.commitRange}`);
+  messages.push(`know-code verify`);
+  messages.push(`  expected: ${primary.hash} (${primary.label})`);
+  messages.push(`  scope:    ${ctx.scope}`);
+  messages.push(`  range:    ${ctx.commitRange}`);
 
   const mb = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
   const fromOid = ctx.rangeFromOid || mb;
 
   if (opts.requireRangeTrailers) {
     const seal = readRangeSeal(repoRoot);
-    const trailerFrom = seal?.rangeFromOid ?? (ctx.scope === "range" ? fromOid : mb);
+    const trailerFrom =
+      seal?.rangeFromOid ?? (ctx.scope === "range" ? fromOid : mb);
     const inferred =
       trailerFrom && !seal?.diffHash
         ? inferUniformRangeTrailerHash(repoRoot, trailerFrom)
         : null;
     const trailerHash = seal?.diffHash ?? inferred ?? ctx.diffHash;
+    const grounded = candidates.some((c) => c.hash === trailerHash);
+    if (!grounded) {
+      errors.push(
+        "know-code: --require-range-trailers: trailer hash is not a grounded verify candidate",
+      );
+      errors.push(
+        `know-code: trailer ${trailerHash.slice(0, 12)}… does not match index / merge-base..HEAD / range-seal`,
+      );
+      return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+    }
     if (
       trailerFrom &&
       rangeHasTipTrailers(repoRoot, trailerFrom, trailerHash)
     ) {
-      console.log(
+      messages.push(
         `know-code: all commits in range have Know-Code-Verified: ${trailerHash.slice(0, 12)}…`,
       );
       if (inferred && !seal?.diffHash) {
-        console.log(
+        messages.push(
           "know-code: verified from commit trailers (no local range-seal.json)",
         );
       }
-      process.exit(0);
+      return {
+        ok: true,
+        exitCode: 0,
+        messages,
+        errors,
+        primary,
+        matched: { label: "range-trailers" },
+        ctx,
+      };
     }
-    console.error(
+    errors.push(
       "know-code: --require-range-trailers: not every commit has Know-Code-Verified",
     );
-    console.error("know-code: run: know-code range seal --rewrite");
-    process.exit(1);
+    errors.push("know-code: run: know-code range seal --rewrite");
+    return { ok: false, exitCode: 1, messages, errors, primary, ctx };
   }
 
   const headMatch = matchHeadTrailer(repoRoot, ctx.headRef, candidates);
   if (headMatch) {
-    console.log(`know-code: HEAD trailer verified (${headMatch.label})`);
-    process.exit(0);
+    messages.push(`know-code: HEAD trailer verified (${headMatch.label})`);
+    return {
+      ok: true,
+      exitCode: 0,
+      messages,
+      errors,
+      primary,
+      matched: headMatch,
+      ctx,
+    };
   }
 
   const ahead = git(["rev-list", "--count", `${mb}..${ctx.headRef}`], repoRoot, {
@@ -119,29 +161,49 @@ export function cmdVerify(opts: {
 
   if (aheadCount > 0 && mb !== ctx.headRef) {
     const trailers = trailersInRange(repoRoot, mb, ctx.headRef);
-    console.log(`  trailers in ${mb.slice(0, 12)}..HEAD: ${trailers.length}`);
+    messages.push(`  trailers in ${mb.slice(0, 12)}..HEAD: ${trailers.length}`);
     for (const c of candidates) {
       if (trailers.includes(c.hash)) {
-        console.log(`know-code: verified (range, ${c.label})`);
-        process.exit(0);
+        messages.push(`know-code: verified (range, ${c.label})`);
+        return {
+          ok: true,
+          exitCode: 0,
+          messages,
+          errors,
+          primary,
+          matched: c,
+          ctx,
+        };
       }
     }
   } else {
-    console.log("  trailers: skipped full-history scan (on base tip)");
+    messages.push("  trailers: skipped full-history scan (on base tip)");
   }
 
   if (opts.requireAll) {
-    console.error("know-code: require-all: missing matching trailers");
+    errors.push("know-code: require-all: missing matching trailers");
   }
 
   if (!config.requireTrailer) {
-    console.error("know-code: requireTrailer is false — verify is optional locally");
+    errors.push(
+      "know-code: requireTrailer is false — verify is optional locally",
+    );
   }
 
-  console.error("know-code: no matching Know-Code-Verified trailer");
-  console.error(
-    `know-code: add trailer: Know-Code-Verified: ${primary.hash}`,
-  );
-  console.error('know-code: tip: know-code commit -m "…" adds the trailer');
-  process.exit(1);
+  errors.push("know-code: no matching Know-Code-Verified trailer");
+  errors.push(`know-code: add trailer: Know-Code-Verified: ${primary.hash}`);
+  errors.push('know-code: tip: know-code commit -m "…" adds the trailer');
+  return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+}
+
+export function cmdVerify(opts: {
+  requireAll?: boolean;
+  requireRangeTrailers?: boolean;
+  rangeSeal?: boolean;
+}): void {
+  const repoRoot = findGitRoot();
+  const result = runVerify(repoRoot, opts);
+  for (const m of result.messages) console.log(m);
+  for (const e of result.errors) console.error(e);
+  process.exit(result.exitCode);
 }

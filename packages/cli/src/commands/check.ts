@@ -1,15 +1,17 @@
 import { readConfig } from "../config.js";
 import {
-  isSignedGateEffective,
-  readGate,
+  headTreeMatchesGate,
+  isGateOpenForShipping,
   resolveEffectiveQuizState,
-} from "../gate.js";
+  trailerSatisfiesCheck,
+} from "../enforcement.js";
+import { readGateSafe } from "../gate.js";
 import { CANONICAL_FLOW } from "../grading.js";
 import { formatCheckDeny } from "../pipeline.js";
 import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
+import { workingTreeClean } from "../git.js";
 import { isSealedRewriteRangeOpen, readRangeSeal } from "../range.js";
-import { headHasTrailer } from "../verify-helpers.js";
 
 export interface CheckResult {
   allowed: boolean;
@@ -18,9 +20,22 @@ export interface CheckResult {
   viaOverride?: boolean;
 }
 
-export function runCheck(repoRoot: string): CheckResult {
+export interface RunCheckOptions {
+  /** Pre-push: ignore COMMIT_EDITMSG; only HEAD trailers satisfy requireTrailer. */
+  push?: boolean;
+}
+
+/** Index/HEAD clean enough that rewrite-open only ships the sealed tip. */
+function indexAlignedWithHead(repoRoot: string): boolean {
+  return workingTreeClean(repoRoot);
+}
+
+export function runCheck(
+  repoRoot: string,
+  opts: RunCheckOptions = {},
+): CheckResult {
   if (process.env.KNOW_CODE_OVERRIDE === "1") {
-    const bypass = tryOverrideBypass(repoRoot);
+    const bypass = tryOverrideBypass(repoRoot, { consume: true });
     if (bypass.allowed) {
       return { allowed: true, viaOverride: true };
     }
@@ -33,29 +48,47 @@ export function runCheck(repoRoot: string): CheckResult {
 
   const config = readConfig(repoRoot);
   const state = resolveEffectiveQuizState(repoRoot, config);
-  const { ctx, effectiveHash, commitDrift } = state;
-  const receipt = readGate(repoRoot);
+  const { ctx } = state;
+  const receipt = readGateSafe(repoRoot);
+  const allowPending = !opts.push;
 
-  if (isSignedGateEffective(repoRoot, receipt, state, config.level)) {
-    const trailerOk =
-      headHasTrailer(repoRoot, ctx.headRef, ctx.diffHash) ||
-      (commitDrift &&
-        headHasTrailer(repoRoot, ctx.headRef, effectiveHash));
-    if (config.requireTrailer && !trailerOk) {
-      // know-code commit/amend attaches the trailer on the new/amended commit.
-      if (process.env.KNOW_CODE_COMMIT === "1") {
-        return { allowed: true };
-      }
+  if (opts.push && receipt && !headTreeMatchesGate(repoRoot, receipt)) {
+    return {
+      allowed: false,
+      reason:
+        "HEAD tree changed since pass — amended commits or extra work on tip?",
+      next: "know-code status",
+    };
+  }
+
+  if (isGateOpenForShipping(repoRoot, receipt, state, config.level)) {
+    if (
+      config.requireTrailer &&
+      !trailerSatisfiesCheck(repoRoot, state, { allowPending })
+    ) {
       return {
         allowed: false,
-        reason: "requireTrailer: HEAD missing Know-Code-Verified trailer",
+        reason: opts.push
+          ? "requireTrailer: HEAD missing Know-Code-Verified trailer"
+          : "requireTrailer: HEAD missing Know-Code-Verified trailer",
         next: "know-code commit -m \"…\"",
       };
     }
     return { allowed: true };
   }
 
-  if (isSealedRewriteRangeOpen(repoRoot)) {
+  // Sealed rewrite may open push of the sealed tip only — not new staged work.
+  if (isSealedRewriteRangeOpen(repoRoot) && indexAlignedWithHead(repoRoot)) {
+    if (
+      config.requireTrailer &&
+      !trailerSatisfiesCheck(repoRoot, state, { allowPending })
+    ) {
+      return {
+        allowed: false,
+        reason: "requireTrailer: sealed tip missing Know-Code-Verified trailer",
+        next: "know-code range seal --rewrite",
+      };
+    }
     return { allowed: true };
   }
 
@@ -63,12 +96,12 @@ export function runCheck(repoRoot: string): CheckResult {
   return { allowed: false, reason, next };
 }
 
-export function cmdCheck(): never {
+export function cmdCheck(opts: RunCheckOptions = {}): never {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const state = resolveEffectiveQuizState(repoRoot, config);
   const { ctx, effectiveHash, commitDrift } = state;
-  const result = runCheck(repoRoot);
+  const result = runCheck(repoRoot, opts);
 
   if (result.allowed) {
     if (result.viaOverride) {
@@ -81,7 +114,7 @@ export function cmdCheck(): never {
         `know-code: gate open (sealed rewrite range) for ${seal.diffHash.slice(0, 12)}…`,
       );
     } else {
-      const receipt = readGate(repoRoot);
+      const receipt = readGateSafe(repoRoot);
       if (commitDrift) {
         console.error(
           `know-code: gate open (${receipt!.level}, ${ctx.scope}) — tree unchanged since pass (${effectiveHash.slice(0, 12)}…)`,

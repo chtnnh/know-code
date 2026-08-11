@@ -1,12 +1,15 @@
 import { readConfig } from "./config.js";
+import { commitDriftVerifyHash } from "./enforcement.js";
 import { git, mergeBase, resolveBaseRef } from "./git.js";
 import {
   computeDiffContext,
   computeRangeDiffContext,
 } from "./hash.js";
 import { readRangeSeal } from "./range.js";
-import { inferUniformRangeTrailerHash, trailerHashFromMessage } from "./trailers.js";
+import { headHasTrailer, inferUniformRangeTrailerHash } from "./trailers.js";
 import type { Config } from "./types.js";
+
+export { headHasTrailer } from "./trailers.js";
 
 export interface VerifyHashCandidate {
   hash: string;
@@ -40,18 +43,11 @@ export function resolveVerifyMergeBase(
   return root || mb;
 }
 
-export function headHasTrailer(
-  repoRoot: string,
-  headRef: string,
-  hash: string,
-): boolean {
-  const headMsg = git(["log", "-1", "--format=%B", headRef], repoRoot, {
-    allowFail: true,
-  });
-  return new RegExp(`^Know-Code-Verified:\\s*${hash}\\s*$`, "im").test(headMsg);
-}
-
-/** Hash candidates CI/local verify accepts on HEAD (squash, single, and range). */
+/**
+ * Hash candidates CI/local verify accepts on HEAD.
+ * Never adds arbitrary HEAD trailer text — only grounded computed hashes
+ * (plus local commit-drift passHash when gate.json + tree are stable).
+ */
 export function collectVerifyHashCandidates(
   repoRoot: string,
   config?: Config,
@@ -80,18 +76,26 @@ export function collectVerifyHashCandidates(
   if (aheadCount > 0 && mb !== headRef) {
     const rangeCtx = computeRangeDiffContext(repoRoot, cfg, mb);
     add(rangeCtx.diffHash, "merge-base..HEAD");
+    // Uniform trailers only count when they match a computed hash (not arbitrary).
     const inferred = inferUniformRangeTrailerHash(repoRoot, mb);
-    if (inferred) add(inferred, "uniform-trailers");
+    if (inferred && seen.has(inferred)) {
+      add(inferred, "uniform-trailers");
+    }
   }
 
   const seal = readRangeSeal(repoRoot);
-  if (seal?.diffHash) add(seal.diffHash, "range-seal");
+  if (seal?.diffHash) {
+    const headOid = git(["rev-parse", "HEAD"], repoRoot, { allowFail: true });
+    const atSealedHead =
+      Boolean(seal.sealedHeadOid) && headOid === seal.sealedHeadOid;
+    if (atSealedHead) {
+      add(seal.diffHash, "range-seal");
+      if (seal.gatePassHash) add(seal.gatePassHash, "range-seal-pass");
+    }
+  }
 
-  const headMsg = git(["log", "-1", "--format=%B", headRef], repoRoot, {
-    allowFail: true,
-  });
-  const headTrailer = trailerHashFromMessage(headMsg);
-  if (headTrailer) add(headTrailer, "head-trailer");
+  const driftHash = commitDriftVerifyHash(repoRoot, cfg);
+  if (driftHash) add(driftHash, "commit-drift");
 
   return candidates;
 }
@@ -113,4 +117,15 @@ export function matchHeadTrailer(
     if (headHasTrailer(repoRoot, headRef, c.hash)) return c;
   }
   return null;
+}
+
+/** True when hash is among grounded verify candidates (excludes blind HEAD text). */
+export function isGroundedVerifyHash(
+  repoRoot: string,
+  hash: string,
+  config?: Config,
+): boolean {
+  return collectVerifyHashCandidates(repoRoot, config).some(
+    (c) => c.hash === hash,
+  );
 }

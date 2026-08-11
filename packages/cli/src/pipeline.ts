@@ -8,11 +8,17 @@ import {
 } from "./attest.js";
 import { readConfig } from "./config.js";
 import {
-  isSignedGateEffective,
-  readGate,
+  hasUnstagedTrackedChanges,
+  isGateOpenForShipping,
   resolveEffectiveQuizState,
+} from "./enforcement.js";
+import {
+  isGatedTreeCurrent,
+  isSignedGateEffective,
+  readGateSafe,
 } from "./gate.js";
 import { readGradeProposal } from "./grading.js";
+import { headMatchesRangeSeal } from "./range-seal-bind.js";
 import { knowCodeDir } from "./paths.js";
 import { readAttestMeta } from "./seal.js";
 import { readRangeSession } from "./range.js";
@@ -34,10 +40,22 @@ function quizExists(repoRoot: string): boolean {
   return existsSync(join(knowCodeDir(repoRoot), "quiz.json"));
 }
 
+function pushCorrupt(
+  blockers: PipelineBlocker[],
+  err: unknown,
+  fallback: string,
+): void {
+  blockers.push({
+    step: "corrupt",
+    message: err instanceof Error ? err.message : fallback,
+    command: "know-code reset",
+  });
+}
+
 export function evaluatePipeline(repoRoot: string): PipelineStatus {
   const config = readConfig(repoRoot);
-  const { ctx, effectiveHash: hash, commitDrift } =
-    resolveEffectiveQuizState(repoRoot, config);
+  const state = resolveEffectiveQuizState(repoRoot, config);
+  const { ctx, effectiveHash: hash, commitDrift } = state;
   const blockers: PipelineBlocker[] = [];
 
   const meta = readAttestMeta(repoRoot);
@@ -62,13 +80,22 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
     });
   }
 
-  const taught = readTaught(repoRoot);
-  if (!taught || taught.diffHash !== hash) {
+  let taught = null;
+  try {
+    taught = readTaught(repoRoot);
+  } catch (err) {
+    pushCorrupt(blockers, err, "corrupt taught.json");
+  }
+  if (taught === null && !blockers.some((b) => b.step === "corrupt")) {
     blockers.push({
       step: "taught",
-      message: taught
-        ? `taught.json stale (hash ${taught.diffHash.slice(0, 12)}…)`
-        : "Teaching not sealed for current hash",
+      message: "Teaching not sealed for current hash",
+      command: "know-code taught",
+    });
+  } else if (taught && taught.diffHash !== hash) {
+    blockers.push({
+      step: "taught",
+      message: `taught.json stale (hash ${taught.diffHash.slice(0, 12)}…)`,
       command: "know-code taught",
     });
   }
@@ -81,42 +108,71 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
     });
   }
 
-  const answers = readAnswers(repoRoot);
-  if (!answers || answers.diffHash !== hash) {
+  let answers = null;
+  try {
+    answers = readAnswers(repoRoot);
+  } catch (err) {
+    pushCorrupt(blockers, err, "corrupt answers.json");
+  }
+  if (answers === null && !blockers.some((b) => b.message.includes("answers"))) {
+    if (!blockers.some((b) => b.step === "corrupt")) {
+      blockers.push({
+        step: "answers",
+        message: "Browser quiz not completed",
+        command: "know-code ask",
+      });
+    }
+  } else if (answers && answers.diffHash !== hash) {
     blockers.push({
       step: "answers",
-      message: answers
-        ? "answers.json stale for current hash"
-        : "Browser quiz not completed",
+      message: "answers.json stale for current hash",
       command: "know-code ask",
     });
   }
 
   if (config.requireGradeProposal !== false) {
-    const proposal = readGradeProposal(repoRoot);
+    let proposal = null;
+    try {
+      proposal = readGradeProposal(repoRoot);
+    } catch (err) {
+      pushCorrupt(blockers, err, "corrupt grade-proposal.json");
+    }
     const digest = answers?.answersDigest;
     if (
-      !proposal ||
+      proposal === null ||
       proposal.diffHash !== hash ||
       (digest && proposal.answersDigest !== digest)
     ) {
-      blockers.push({
-        step: "grade-proposal",
-        message: proposal
-          ? "grade-proposal.json stale or mismatched"
-          : "Agent grading proposal missing",
-        command: "Agent: write .know-code/grade-proposal.json after ask",
-      });
+      if (!blockers.some((b) => b.message.includes("grade-proposal"))) {
+        blockers.push({
+          step: "grade-proposal",
+          message: proposal
+            ? "grade-proposal.json stale or mismatched"
+            : "Agent grading proposal missing",
+          command: "Agent: write .know-code/grade-proposal.json after ask",
+        });
+      }
     }
   }
 
-  const grade = readGrade(repoRoot);
-  if (!grade || grade.diffHash !== hash) {
+  let grade = null;
+  try {
+    grade = readGrade(repoRoot);
+  } catch (err) {
+    pushCorrupt(blockers, err, "corrupt grade.json");
+  }
+  if (grade === null) {
+    if (!blockers.some((b) => b.message.includes("grade.json"))) {
+      blockers.push({
+        step: "grade",
+        message: "Grade not sealed",
+        command: "know-code grade --review",
+      });
+    }
+  } else if (grade.diffHash !== hash) {
     blockers.push({
       step: "grade",
-      message: grade
-        ? "grade.json stale for current hash"
-        : "Grade not sealed",
+      message: "grade.json stale for current hash",
       command: "know-code grade --review",
     });
   } else if (!grade.passed || grade.score < PASS_SCORE) {
@@ -127,14 +183,21 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
     });
   }
 
-  const gate = readGate(repoRoot);
-  const allowed = isSignedGateEffective(repoRoot, gate, {
-    ctx,
-    effectiveHash: hash,
-    commitDrift,
-  }, config.level);
+  const gate = readGateSafe(repoRoot);
+  const gatePath = join(knowCodeDir(repoRoot), "gate.json");
+  if (existsSync(gatePath) && !gate) {
+    pushCorrupt(
+      blockers,
+      new Error("corrupt .know-code/gate.json"),
+      "corrupt gate.json",
+    );
+  }
 
-  if (!allowed) {
+  const hasCorrupt = blockers.some((b) => b.step === "corrupt");
+  const allowed =
+    !hasCorrupt && isGateOpenForShipping(repoRoot, gate, state, config.level);
+
+  if (!allowed && !hasCorrupt) {
     if (!gate || (gate.diffHash !== hash && !commitDrift)) {
       blockers.push({
         step: "pass",
@@ -143,11 +206,41 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
           : "Gate not open",
         command: "know-code pass",
       });
-    } else {
+    } else if (hasUnstagedTrackedChanges(repoRoot)) {
+      blockers.push({
+        step: "pass",
+        message:
+          "Unstaged tracked edits close the gate (git add or stash)",
+        command: "git add -A",
+      });
+    } else if (
+      gate.gatedTreeOid &&
+      !isGatedTreeCurrent(repoRoot, gate.gatedTreeOid)
+    ) {
+      blockers.push({
+        step: "pass",
+        message:
+          "Staged tree differs from gated tree (re-run taught → quiz → pass)",
+        command: "know-code taught",
+      });
+    } else if (!headMatchesRangeSeal(repoRoot)) {
+      blockers.push({
+        step: "pass",
+        message:
+          "HEAD moved after range seal — start a new range or re-run pass",
+        command: "know-code range begin",
+      });
+    } else if (!isSignedGateEffective(repoRoot, gate, state, config.level)) {
       blockers.push({
         step: "pass",
         message: "Gate seal invalid or level too low",
         command: "know-code pass",
+      });
+    } else {
+      blockers.push({
+        step: "pass",
+        message: "Gate closed (see know-code status --json)",
+        command: "know-code status",
       });
     }
   }
@@ -161,7 +254,7 @@ export function formatCheckDeny(
   repoRoot: string,
   config: Config,
   ctx: QuizContext,
-  receipt: ReturnType<typeof readGate>,
+  receipt: ReturnType<typeof readGateSafe>,
 ): { reason: string; next: string } {
   const pipeline = evaluatePipeline(repoRoot);
   const { commitDrift } = resolveEffectiveQuizState(repoRoot, config);
@@ -195,6 +288,13 @@ export function formatCheckDeny(
       reason:
         "diff changed since last quiz — staged new work or amended commits?",
       next: "know-code status",
+    };
+  }
+  if (!receipt.gatedTreeOid) {
+    return {
+      reason:
+        "gate.json missing gatedTreeOid (legacy) — re-run know-code pass after upgrading to ≥0.3.0",
+      next: "know-code pass",
     };
   }
   if (config.requireAttest && !receipt.sig) {

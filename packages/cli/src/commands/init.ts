@@ -10,7 +10,7 @@ import { findGitRoot, knowCodeDir } from "../paths.js";
 import { DEFAULT_CONFIG, isLevel, isRangeMode, isRangeSealMode, type Config } from "../types.js";
 
 const DOCS = "https://kc.chtnnhfoundation.org";
-const ACTION_REF = "chtnnh/know-code/action@v0.2.0";
+const ACTION_REF = "chtnnh/know-code/action@v0.2.1";
 
 export function consumerWorkflowYaml(baseBranch: string): string {
   return `name: know-code
