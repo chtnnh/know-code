@@ -34,6 +34,7 @@ import {
   uninstallAgentHooks,
 } from "./hooks.js";
 import { findGitRoot, gitHooksDir } from "./paths.js";
+import { materializedTreeOid, writeGate } from "./gate.js";
 import { computeDiffContext, sha256 } from "./hash.js";
 import { evaluatePipeline } from "./pipeline.js";
 import {
@@ -78,6 +79,77 @@ describe("commands: check", () => {
       setupOpenGate(root, { requireTrailer: true });
       assert.equal(runCheck(root).allowed, false);
       assert.match(runCheck(root).reason || "", /requireTrailer/);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("pre-push accepts seal-hash trailer at sealed rewrite tip only", () => {
+    const { root, cleanup } = withTempRepo("kc-cmd-check-sealtip-");
+    try {
+      writeFile(root, "a.txt", "base\n");
+      commitAll(root, "base");
+      const fromOid = git(root, ["rev-parse", "HEAD"]);
+      mkdirSync(join(root, ".know-code"), { recursive: true });
+      const cfg = liteConfig({ rangeMode: "range", requireTrailer: true });
+      writeConfig(root, cfg);
+      beginRangeSession(root, fromOid);
+
+      // Pass over staged work, then land it with the passHash trailer.
+      writeFile(root, "a.txt", "feat\n");
+      git(root, ["add", "a.txt"]);
+      const passHash = computeDiffContext(root, cfg).diffHash;
+      writeGate(root, {
+        version: 1,
+        diffHash: passHash,
+        level: "lite",
+        passedAt: new Date().toISOString(),
+        commitRange: `${fromOid}..HEAD`,
+        baseRef: fromOid,
+        headRef: fromOid,
+        scope: "range",
+        rangeFromOid: fromOid,
+        commitCount: 0,
+        gatedTreeOid: materializedTreeOid(root),
+      });
+      git(root, ["commit", "-m", `feat\n\nKnow-Code-Verified: ${passHash}\n`]);
+
+      // Seal --rewrite restamps trailers with the recomputed range hash.
+      const sealHash = "a".repeat(64);
+      git(root, [
+        "commit",
+        "--amend",
+        "-m",
+        `feat\n\nKnow-Code-Verified: ${sealHash}\n`,
+      ]);
+      const sealedHead = git(root, ["rev-parse", "HEAD"]);
+      writeRangeSeal(root, {
+        version: 1,
+        diffHash: sealHash,
+        gatePassHash: passHash,
+        rangeFromOid: fromOid,
+        commitCount: 1,
+        sealMode: "rewrite",
+        gateKeyId: "unsigned",
+        sealedAt: new Date().toISOString(),
+        sealedHeadOid: sealedHead,
+      });
+      clearRangeSession(root);
+
+      // Seal trailer isn't tipHash or drift passHash — only the seal grounds it.
+      assert.equal(runCheck(root, { push: true }).allowed, true);
+
+      // Push-mode only: a pending trailerless commit at the sealed tip must
+      // not ride HEAD's seal trailer through pre-commit (Bugbot finding).
+      writeCommitEditMsg(root, "sneak: trailerless commit at sealed tip");
+      assert.equal(runCheck(root).allowed, false);
+      assert.match(runCheck(root).reason || "", /requireTrailer/);
+      writeCommitEditMsg(root, `feat\n\nKnow-Code-Verified: ${sealHash}\n`);
+
+      // A commit after seal moves HEAD off sealedHeadOid — deny again.
+      writeFile(root, "b.txt", "post-seal\n");
+      commitAll(root, "post-seal work");
+      assert.equal(runCheck(root, { push: true }).allowed, false);
     } finally {
       cleanup();
     }
@@ -178,10 +250,13 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
     }
   });
 
-  it("consumerWorkflowYaml pins action and base branch", () => {
+  it("consumerWorkflowYaml pins action, base branch, and is PR-only", () => {
     const yml = consumerWorkflowYaml("develop");
     assert.match(yml, /base-branch: develop/);
-    assert.match(yml, /chtnnh\/know-code\/action@v0\.2\.1/);
+    assert.match(yml, /chtnnh\/know-code\/action@v0\.3\.0/);
+    // Push-to-base has no merge-base ahead of HEAD — verify must be PR-only.
+    assert.match(yml, /pull_request:/);
+    assert.doesNotMatch(yml, /push:/);
   });
 
   it("validateQuiz happy and sad", () => {

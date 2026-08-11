@@ -1,10 +1,11 @@
 name: know-code
 
+# PR-only: grounded verification needs a merge-base ahead of HEAD. On a push
+# to main, HEAD *is* origin/main (zero commits ahead), so there is no range to
+# recompute and verify can never match a grounded hash.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches: [main]
 
 jobs:
   verify:

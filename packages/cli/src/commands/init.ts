@@ -10,15 +10,15 @@ import { findGitRoot, knowCodeDir } from "../paths.js";
 import { DEFAULT_CONFIG, isLevel, isRangeMode, isRangeSealMode, type Config } from "../types.js";
 
 const DOCS = "https://kc.chtnnhfoundation.org";
-const ACTION_REF = "chtnnh/know-code/action@v0.2.1";
+const ACTION_REF = "chtnnh/know-code/action@v0.3.0";
 
 export function consumerWorkflowYaml(baseBranch: string): string {
+  // PR-only: on a push to the base branch there is no merge-base ahead of
+  // HEAD, so grounded verification has no range to recompute.
   return `name: know-code
 
 on:
   pull_request:
-  push:
-    branches: [${baseBranch}]
 
 jobs:
   verify:

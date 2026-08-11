@@ -152,7 +152,9 @@ function parseArgs(argv: string[]): {
   }
   const flags: Record<string, string | boolean> = {};
   const rest: string[] = [];
-  const all = sub0 ? [sub0, ...rest0] : rest0;
+  // Include sub1 — dropping it swallowed the second token of generic
+  // commands (e.g. the value of `pass --hash <hash>`, `hash --json --explain`).
+  const all = [sub0, sub1, ...rest0].filter((x): x is string => x !== undefined);
   for (let i = 0; i < all.length; i++) {
     const arg = all[i];
     if (!arg.startsWith("--")) {

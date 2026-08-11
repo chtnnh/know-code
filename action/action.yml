@@ -2,7 +2,8 @@ name: know-code verify
 description: >-
   Verify Know-Code-Verified commit trailers. Primary check: HEAD message
   matches the current tree hash (empty-tree→index). Secondary: trailers on
-  commits ahead of the base branch. Use on pull_request and push to main.
+  commits ahead of the base branch. Use on pull_request only — on a direct
+  push to the base branch there is no merge-base range to verify.
 author: chtnnh
 branding:
   icon: shield
@@ -24,7 +25,7 @@ inputs:
   version:
     description: npm version range for know-code when not building from this repo
     required: false
-    default: "^0.2.0"
+    default: "^0.3.0"
 
 runs:
   using: composite

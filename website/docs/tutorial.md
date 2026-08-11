@@ -13,7 +13,7 @@ Prerequisites: a git repo with at least one commit on `main`, Node 20+.
 | [3. Teach](#3-agent-teaches-you-seal) | Agent explains · **you** `taught` | Receipt that you were taught |
 | [4. Quiz](#4-agent-writes-quiz-you-answer-in-browser) | Agent writes quiz · **you** answer in browser | Comprehension check |
 | [5. Grade + pass](#5-agent-proposes-grade-you-seal) | Agent proposes · **you** `grade --review` + `pass` | Gate opens |
-| [6. Commit](#6-agent-commits) | You `git add` · Agent `git commit` | Plain git after pass |
+| [6. Commit](#6-agent-commits-plain-git) | You `git add` · Agent `git commit` | Plain git after pass |
 | [7. Ship](#7-verify-and-push) | You | `range seal --rewrite`, push |
 
 ```mermaid

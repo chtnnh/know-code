@@ -18,8 +18,6 @@ name: know-code
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   verify:
@@ -34,6 +32,13 @@ jobs:
           base-branch: main
           require-range-trailers: true
 ```
+
+:::note PR-only trigger
+Grounded verification recomputes the diff between the merge-base and HEAD. On a
+push **to** the base branch itself, HEAD *is* the base (zero commits ahead), so
+there is no range to recompute — which is why the workflow runs on
+`pull_request` only. Direct pushes are enforced locally by the pre-push hook.
+:::
 
 ## Composite action inputs
 

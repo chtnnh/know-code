@@ -1,11 +1,10 @@
 name: docs
 
+# Docs deploy only on release tags (or manual dispatch) so the site always
+# matches a published CLI version, not main's tip.
 on:
   push:
-    branches: [main]
-    paths:
-      - "website/**"
-      - ".github/workflows/docs.yml"
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

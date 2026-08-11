@@ -4,13 +4,22 @@ Verify `Know-Code-Verified` commit trailers in CI.
 
 ## Usage
 
+Trigger the workflow on `pull_request` only. On a direct push to the base
+branch, `HEAD` equals the base so there is no merge-base range to verify —
+gate direct pushes locally with the pre-push hook instead.
+
 ```yaml
-- uses: chtnnh/know-code/action@v0.2.0
+on:
+  pull_request:
+
+# ...
+
+- uses: chtnnh/know-code/action@v0.3.0
   with:
     base-branch: main
     require-all: false
     require-range-trailers: false
-    version: "^0.2.0"
+    version: "^0.3.0"
 ```
 
 ## Inputs
@@ -20,7 +29,7 @@ Verify `Know-Code-Verified` commit trailers in CI.
 | `base-branch` | `main` | Base branch for diff hashing |
 | `require-all` | `false` | Stricter verify messaging |
 | `require-range-trailers` | `false` | Every commit in range must have trailer (rewrite teams) |
-| `version` | `^0.2.0` | npm version when not building from monorepo checkout |
+| `version` | `^0.3.0` | npm version when not building from monorepo checkout |
 
 ## Quick add
 

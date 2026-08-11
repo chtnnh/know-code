@@ -12,6 +12,7 @@ import { tryOverrideBypass } from "../override.js";
 import { findGitRoot } from "../paths.js";
 import { workingTreeClean } from "../git.js";
 import { isSealedRewriteRangeOpen, readRangeSeal } from "../range.js";
+import { headHasTrailer } from "../trailers.js";
 
 export interface CheckResult {
   allowed: boolean;
@@ -28,6 +29,24 @@ export interface RunCheckOptions {
 /** Index/HEAD clean enough that rewrite-open only ships the sealed tip. */
 function indexAlignedWithHead(repoRoot: string): boolean {
   return workingTreeClean(repoRoot);
+}
+
+/**
+ * After range seal --rewrite, HEAD trailers carry the seal hash — not the tip
+ * hash or drift passHash that headTrailerSatisfiesCheck knows. Accept it only
+ * at the exact sealed tip with a grounded seal (isSealedRewriteRangeOpen
+ * verifies signed gate, stable tree, and HEAD === sealedHeadOid), and only in
+ * push mode: the seal authorizes shipping the sealed tip, never a new pending
+ * commit riding HEAD's seal trailer through pre-commit.
+ */
+function sealedTipTrailerSatisfies(repoRoot: string): boolean {
+  if (!isSealedRewriteRangeOpen(repoRoot)) return false;
+  const seal = readRangeSeal(repoRoot);
+  if (!seal?.diffHash) return false;
+  if (headHasTrailer(repoRoot, "HEAD", seal.diffHash)) return true;
+  return Boolean(
+    seal.gatePassHash && headHasTrailer(repoRoot, "HEAD", seal.gatePassHash),
+  );
 }
 
 export function runCheck(
@@ -64,13 +83,12 @@ export function runCheck(
   if (isGateOpenForShipping(repoRoot, receipt, state, config.level)) {
     if (
       config.requireTrailer &&
-      !trailerSatisfiesCheck(repoRoot, state, { allowPending })
+      !trailerSatisfiesCheck(repoRoot, state, { allowPending }) &&
+      !(opts.push && sealedTipTrailerSatisfies(repoRoot))
     ) {
       return {
         allowed: false,
-        reason: opts.push
-          ? "requireTrailer: HEAD missing Know-Code-Verified trailer"
-          : "requireTrailer: HEAD missing Know-Code-Verified trailer",
+        reason: "requireTrailer: HEAD missing Know-Code-Verified trailer",
         next: "know-code commit -m \"…\"",
       };
     }
@@ -81,7 +99,8 @@ export function runCheck(
   if (isSealedRewriteRangeOpen(repoRoot) && indexAlignedWithHead(repoRoot)) {
     if (
       config.requireTrailer &&
-      !trailerSatisfiesCheck(repoRoot, state, { allowPending })
+      !trailerSatisfiesCheck(repoRoot, state, { allowPending }) &&
+      !(opts.push && sealedTipTrailerSatisfies(repoRoot))
     ) {
       return {
         allowed: false,
