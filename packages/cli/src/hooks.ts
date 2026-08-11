@@ -40,23 +40,52 @@ ${HOOK_MARKER}
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
+# Never honor KNOW_CODE_COMMIT from the environment. Pre-commit requireTrailer
+# is satisfied by a grounded Know-Code-Verified trailer in COMMIT_EDITMSG.
+# Pre-push passes --push so only HEAD trailers count (stale EDITMSG ignored).
+unset KNOW_CODE_COMMIT || true
+
+CHECK_ARGS=()
+if [[ "$(basename "$0")" == "pre-push" ]]; then
+  CHECK_ARGS+=(--push)
+fi
 
 run_check() {
-  if [[ -f "$ROOT/packages/cli/dist/index.js" ]]; then
-    node "$ROOT/packages/cli/dist/index.js" check
-    return $?
-  fi
-  if [[ -x "$ROOT/node_modules/.bin/know-code" ]]; then
-    "$ROOT/node_modules/.bin/know-code" check
-    return $?
-  fi
-  if command -v know-code >/dev/null 2>&1; then
-    know-code check
-    return $?
-  fi
-  if command -v npx >/dev/null 2>&1; then
-    npx --yes know-code check
-    return $?
+  # Bash 3.2 + set -u: empty "\${arr[@]}" is "unbound variable" — branch on length.
+  if [[ \${#CHECK_ARGS[@]} -gt 0 ]]; then
+    if [[ -f "$ROOT/packages/cli/dist/index.js" ]]; then
+      node "$ROOT/packages/cli/dist/index.js" check "\${CHECK_ARGS[@]}"
+      return $?
+    fi
+    if [[ -x "$ROOT/node_modules/.bin/know-code" ]]; then
+      "$ROOT/node_modules/.bin/know-code" check "\${CHECK_ARGS[@]}"
+      return $?
+    fi
+    if command -v know-code >/dev/null 2>&1; then
+      know-code check "\${CHECK_ARGS[@]}"
+      return $?
+    fi
+    if command -v npx >/dev/null 2>&1; then
+      npx --yes know-code check "\${CHECK_ARGS[@]}"
+      return $?
+    fi
+  else
+    if [[ -f "$ROOT/packages/cli/dist/index.js" ]]; then
+      node "$ROOT/packages/cli/dist/index.js" check
+      return $?
+    fi
+    if [[ -x "$ROOT/node_modules/.bin/know-code" ]]; then
+      "$ROOT/node_modules/.bin/know-code" check
+      return $?
+    fi
+    if command -v know-code >/dev/null 2>&1; then
+      know-code check
+      return $?
+    fi
+    if command -v npx >/dev/null 2>&1; then
+      npx --yes know-code check
+      return $?
+    fi
   fi
   return 127
 }
@@ -82,7 +111,13 @@ exit "$rc"
 /** True when an on-disk hook matches the current generated script. */
 export function gitGateHookIsCurrent(content: string): boolean {
   if (!content.includes(HOOK_MARKER)) return false;
-  return content.includes("run_check || rc=$?");
+  return (
+    content.includes("run_check || rc=$?") &&
+    content.includes("unset KNOW_CODE_COMMIT") &&
+    content.includes("--push") &&
+    // 0.3.0: empty CHECK_ARGS under bash 3.2 + set -u
+    content.includes("${#CHECK_ARGS[@]}")
+  );
 }
 
 export function gitHooksNeedUpgrade(repoRoot: string): boolean {
