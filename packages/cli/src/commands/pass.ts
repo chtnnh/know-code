@@ -6,6 +6,7 @@ import {
   assertTaughtForHash,
 } from "../attest.js";
 import { materializedTreeOid, writeGate } from "../gate.js";
+import { hasUnstagedTrackedChanges, unstagedTrackedFileNames } from "../git.js";
 import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
 import { sealPayload } from "../seal.js";
@@ -24,6 +25,19 @@ export async function cmdPass(opts: {
   const ctx = resolveQuizContext(repoRoot, config);
   const level = resolveLevel(repoRoot, opts.level);
   const hash = opts.hash || ctx.diffHash;
+
+  if (hasUnstagedTrackedChanges(repoRoot)) {
+    const files = unstagedTrackedFileNames(repoRoot);
+    console.error(
+      "know-code: pass refused — unstaged tracked edits are not in the quiz hash.\n" +
+        "know-code: the gate would close immediately after pass (E01).\n" +
+        "know-code: git add or stash these paths first:",
+    );
+    for (const f of files.slice(0, 20)) console.error(`  ! ${f}`);
+    if (files.length > 20) console.error(`  … +${files.length - 20} more`);
+    console.error('know-code: tip: know-code hash --explain');
+    process.exit(1);
+  }
 
   if (hash !== ctx.diffHash) {
     console.error(
@@ -92,7 +106,10 @@ export async function cmdPass(opts: {
   );
   if (ctx.scope === "range") {
     console.log(
-      "know-code: then: know-code range seal   # after commit (optional --rewrite)",
+      'know-code: sliced batch: know-code commit -m "<msg>" -- <files…>  (gate stays open while index tree matches)',
+    );
+    console.log(
+      "know-code: then: know-code range seal --rewrite   # after all slices",
     );
   }
 }

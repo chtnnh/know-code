@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { readConfig, resolveLevel } from "../config.js";
 import { writeAnswers, assertTaughtForHash } from "../attest.js";
+import { hasUnstagedTrackedChanges, unstagedTrackedFileNames } from "../git.js";
 import { resolveQuizContext } from "../hash.js";
 import {
   collectQuotaSignals,
@@ -265,6 +266,22 @@ export async function cmdAsk(opts: {
   timeout?: string;
 }): Promise<void> {
   const repoRoot = findGitRoot();
+  if (hasUnstagedTrackedChanges(repoRoot)) {
+    const files = unstagedTrackedFileNames(repoRoot);
+    const preview = files
+      .slice(0, 20)
+      .map((f) => `  ! ${f}`)
+      .join("\n");
+    const more =
+      files.length > 20 ? `\n  … +${files.length - 20} more` : "";
+    throw new Error(
+      "ask refused — unstaged tracked edits are not in the quiz hash.\n" +
+        "The gate would close immediately after pass (E01).\n" +
+        "git add or stash these paths first:\n" +
+        `${preview}${more}\n` +
+        "tip: know-code hash --explain",
+    );
+  }
   const quizPath =
     opts.quiz || join(knowCodeDir(repoRoot), "quiz.json");
   if (!existsSync(quizPath)) {
