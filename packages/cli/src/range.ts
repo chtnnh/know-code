@@ -7,8 +7,9 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { readConfig } from "./config.js";
+import { isTreeStableSincePass } from "./enforcement.js";
 import { git, mergeBase, resolveBaseRef } from "./git.js";
-import { isSignedGateOpen, readGate } from "./gate.js";
+import { isSignedGateOpen, readGateSafe } from "./gate.js";
 import { knowCodeDir, rangeSealPath } from "./paths.js";
 import { assertSigned } from "./seal.js";
 import { rangeHasTipTrailers } from "./trailers.js";
@@ -115,15 +116,33 @@ export function clearRangeSeal(repoRoot: string): void {
   if (existsSync(path)) unlinkSync(path);
 }
 
-/** After range seal --rewrite, index hash differs but trailers + gate match the sealed range. */
+/** After range seal --rewrite, tip hash / trailers match seal even if gate was passHash. */
 export function isSealedRewriteRangeOpen(repoRoot: string): boolean {
   const seal = readRangeSeal(repoRoot);
   if (!seal || seal.sealMode !== "rewrite" || !seal.rangeFromOid) {
     return false;
   }
+  // New commits after seal move HEAD — rewrite-open only at the sealed tip.
+  // Legacy seals without sealedHeadOid cannot open rewrite path.
+  if (!seal.sealedHeadOid) return false;
+  const head = git(["rev-parse", "HEAD"], repoRoot, { allowFail: true });
+  if (head !== seal.sealedHeadOid) return false;
   const config = readConfig(repoRoot);
-  const gate = readGate(repoRoot);
-  if (!isSignedGateOpen(repoRoot, gate, seal.diffHash, config.level)) {
+  const gate = readGateSafe(repoRoot);
+  const level = config.level;
+  const gateOk =
+    isSignedGateOpen(repoRoot, gate, seal.diffHash, level) ||
+    Boolean(
+      seal.gatePassHash &&
+        isSignedGateOpen(repoRoot, gate, seal.gatePassHash, level),
+    ) ||
+    Boolean(
+      gate?.diffHash &&
+        isSignedGateOpen(repoRoot, gate, gate.diffHash, level),
+    );
+  if (!gateOk) return false;
+  // Tree must still match pass-time gatedTreeOid (blocks post-pass history rewrites).
+  if (!gate?.gatedTreeOid || !isTreeStableSincePass(repoRoot, gate)) {
     return false;
   }
   if (config.requireAttest) {

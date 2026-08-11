@@ -1,7 +1,11 @@
 import { readConfig } from "../config.js";
+import {
+  headTrailerSatisfiesCheck,
+  isGateOpenForShipping,
+  resolveEffectiveQuizState,
+} from "../enforcement.js";
 import { git } from "../git.js";
-import { isSignedGateOpen, readGate } from "../gate.js";
-import { resolveQuizContext } from "../hash.js";
+import { readGateSafe } from "../gate.js";
 import { findGitRoot } from "../paths.js";
 import {
   beginRangeSession,
@@ -12,6 +16,7 @@ import {
   readRangeSeal,
   writeRangeSeal,
 } from "../range.js";
+import { bindGateSealedHead, clearGateSealedHeadBinding } from "../range-seal-bind.js";
 import { assertNotAgentHook, sealPayload } from "../seal.js";
 import { applyTrailerToRange } from "../trailers.js";
 import type { RangeSealReceipt, RangeSealMode } from "../types.js";
@@ -33,17 +38,26 @@ export function cmdRangeStatus(json = false): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const session = readRangeSession(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
-  const gate = readGate(repoRoot);
+  const state = resolveEffectiveQuizState(repoRoot, config);
+  const { ctx, effectiveHash, commitDrift } = state;
+  const gate = readGateSafe(repoRoot);
   const seal = readRangeSeal(repoRoot);
+  const gateOpen = isGateOpenForShipping(
+    repoRoot,
+    gate,
+    state,
+    config.level,
+  );
 
   const payload = {
     active: !!session,
     session,
     quizHash: ctx.diffHash,
+    effectiveHash: commitDrift ? effectiveHash : undefined,
+    commitDrift,
     scope: ctx.scope,
     commitCount: ctx.commitCount,
-    gateOpen: isSignedGateOpen(repoRoot, gate, ctx.diffHash, config.level),
+    gateOpen,
     rangeSeal: seal,
   };
 
@@ -59,7 +73,12 @@ export function cmdRangeStatus(json = false): void {
     console.log(`  from:      ${session.fromOid.slice(0, 12)}… (${n} commits)`);
   }
   console.log(`  hash:      ${ctx.diffHash}`);
-  console.log(`  gate:      ${payload.gateOpen ? "open" : "closed"}`);
+  if (commitDrift) {
+    console.log(
+      `  gate hash: ${effectiveHash} (tree unchanged since pass)`,
+    );
+  }
+  console.log(`  gate:      ${gateOpen ? "open" : "closed"}`);
   console.log(`  sealed:    ${seal ? seal.sealMode : "no"}`);
 }
 
@@ -68,6 +87,7 @@ export function cmdRangeAbort(opts: { keepSeal?: boolean } = {}): void {
   clearRangeSession(repoRoot);
   if (!opts.keepSeal) {
     clearRangeSeal(repoRoot);
+    clearGateSealedHeadBinding(repoRoot);
     console.log("know-code: range session and seal cleared.");
   } else {
     console.log("know-code: range session cleared (seal kept).");
@@ -92,8 +112,9 @@ export async function cmdRangeSeal(opts: {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const session = readRangeSession(repoRoot);
-  const ctx = resolveQuizContext(repoRoot, config);
-  const gate = readGate(repoRoot);
+  const state = resolveEffectiveQuizState(repoRoot, config);
+  const { ctx, effectiveHash, commitDrift } = state;
+  const gate = readGateSafe(repoRoot);
 
   if (!session && ctx.scope !== "range") {
     console.error(
@@ -108,12 +129,26 @@ export async function cmdRangeSeal(opts: {
     process.exit(1);
   }
 
-  if (!isSignedGateOpen(repoRoot, gate, ctx.diffHash, config.level)) {
+  if (!gate) {
+    console.error(
+      "know-code: range seal blocked — missing or corrupt .know-code/gate.json.",
+    );
+    console.error("know-code: next: know-code pass");
+    process.exit(1);
+  }
+
+  if (!isGateOpenForShipping(repoRoot, gate, state, config.level)) {
     console.error(
       "know-code: range seal requires a signed gate for the current range hash.",
     );
     console.error("know-code: flow: taught → ask → grade → pass → range seal");
     process.exit(1);
+  }
+
+  if (commitDrift) {
+    console.error(
+      `know-code: sealing with tip hash ${ctx.diffHash.slice(0, 12)}… (pass was on ${effectiveHash.slice(0, 12)}…)`,
+    );
   }
 
   const staged = git(["diff", "--cached", "--name-only"], repoRoot, {
@@ -135,31 +170,6 @@ export async function cmdRangeSeal(opts: {
     console.error(
       "know-code: WARNING — rewrite mode changes commit SHAs. You will need git push --force-with-lease.",
     );
-  }
-
-  const unsigned: Omit<RangeSealReceipt, "keyId" | "sig"> = {
-    version: 1,
-    diffHash: ctx.diffHash,
-    rangeFromOid: fromOid,
-    commitCount: ctx.commitCount,
-    sealMode,
-    gateKeyId: gate!.keyId || "unsigned",
-    sealedAt: new Date().toISOString(),
-  };
-
-  try {
-    const sealed = (await sealPayload(
-      repoRoot,
-      unsigned as unknown as Record<string, unknown>,
-      { passphrase: opts.passphrase },
-    )) as unknown as RangeSealReceipt;
-    writeRangeSeal(repoRoot, sealed);
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : err);
-    process.exit(1);
-  }
-
-  if (sealMode === "rewrite") {
     try {
       const { rewritten } = applyTrailerToRange(
         repoRoot,
@@ -174,19 +184,50 @@ export async function cmdRangeSeal(opts: {
       console.error(err instanceof Error ? err.message : err);
       process.exit(1);
     }
-  } else {
-    // Receipt mode: ensure HEAD has trailer for CI
-    const headMsg = git(["log", "-1", "--format=%B"], repoRoot);
-    const trailer = `Know-Code-Verified: ${ctx.diffHash}`;
-    if (!new RegExp(`^Know-Code-Verified:\\s*${ctx.diffHash}\\s*$`, "im").test(headMsg)) {
+  } else if (!headTrailerSatisfiesCheck(repoRoot, state)) {
+    console.error(
+      "know-code: receipt mode — HEAD must carry Know-Code-Verified before seal.",
+    );
+    console.error(`  Know-Code-Verified: ${ctx.diffHash}`);
+    if (commitDrift) {
       console.error(
-        "know-code: receipt mode — add trailer to HEAD (or latest commit):",
-      );
-      console.error(`  ${trailer}`);
-      console.error(
-        'know-code: tip: know-code commit -m "…" on a new commit, or amend HEAD',
+        `  (or pass hash while tree unchanged: ${effectiveHash})`,
       );
     }
+    console.error(
+      'know-code: tip: know-code commit -m "…" on a new commit, or amend HEAD',
+    );
+    process.exit(1);
+  }
+
+  // Bind after rewrite so sealedHeadOid matches the tip that will be pushed.
+  const sealedHeadOid = git(["rev-parse", "HEAD"], repoRoot);
+  const unsigned: Omit<RangeSealReceipt, "keyId" | "sig"> = {
+    version: 1,
+    diffHash: ctx.diffHash,
+    rangeFromOid: fromOid,
+    commitCount: ctx.commitCount,
+    sealMode,
+    gateKeyId: gate!.keyId || "unsigned",
+    sealedAt: new Date().toISOString(),
+    sealedHeadOid,
+    ...(commitDrift ? { gatePassHash: effectiveHash } : {}),
+  };
+
+  try {
+    const sealed = (await sealPayload(
+      repoRoot,
+      unsigned as unknown as Record<string, unknown>,
+      { passphrase: opts.passphrase },
+    )) as unknown as RangeSealReceipt;
+    writeRangeSeal(repoRoot, sealed);
+    await bindGateSealedHead(repoRoot, sealedHeadOid, {
+      passphrase: opts.passphrase,
+      diffHash: ctx.diffHash,
+    });
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
   }
 
   clearRangeSession(repoRoot);

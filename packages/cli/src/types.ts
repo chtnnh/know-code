@@ -42,7 +42,8 @@ export const DEFAULT_CONFIG: Config = {
   requireAttest: true,
   requireGradeProposal: true,
   allowSelfScore: false,
-  enforcePipeline: false,
+  /** 0.3.0: teaching + quiz pipeline required before pass by default. */
+  enforcePipeline: true,
 };
 
 export interface GateReceipt {
@@ -59,18 +60,34 @@ export interface GateReceipt {
   answersDigest?: string;
   /** Materialized tree (write-tree) at pass — survives commit-only hash drift. */
   gatedTreeOid?: string;
+  /** HEAD oid bound at range seal — survives range-seal.json deletion. */
+  sealedHeadOid?: string;
+  keyId?: string;
+  sig?: string;
+}
+
+export interface SealedHeadBindingReceipt {
+  version: 1;
+  sealedHeadOid: string;
+  boundAt: string;
+  diffHash?: string;
   keyId?: string;
   sig?: string;
 }
 
 export interface RangeSealReceipt {
   version: 1;
+  /** Tip hash at seal time (used for rewrite trailers / CI). */
   diffHash: string;
   rangeFromOid: string;
   commitCount: number;
   sealMode: RangeSealMode;
   gateKeyId: string;
   sealedAt: string;
+  /** HEAD oid when the range was sealed (binds verify + rewrite-open). */
+  sealedHeadOid?: string;
+  /** Pass-time hash when seal happened under commitDrift (audit). */
+  gatePassHash?: string;
   keyId?: string;
   sig?: string;
 }
