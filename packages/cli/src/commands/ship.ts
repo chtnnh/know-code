@@ -3,15 +3,29 @@ import { evaluatePipeline } from "../pipeline.js";
 import { findGitRoot } from "../paths.js";
 import { readRangeSession } from "../range.js";
 import { runCheck } from "./check.js";
+import { runDoctor } from "./doctor.js";
 import { cmdVerify } from "./verify.js";
 
-export function cmdShip(opts: { dryRun?: boolean }): void {
+export async function cmdShip(opts: { dryRun?: boolean }): Promise<void> {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
-  const pipeline = evaluatePipeline(repoRoot);
 
   console.log("know-code ship checklist");
   console.log("");
+
+  const doctor = await runDoctor(repoRoot, { strict: true });
+  const doctorFail = doctor.filter((c) => !c.ok);
+  if (doctorFail.length) {
+    console.log("0. doctor --strict:");
+    for (const c of doctorFail) {
+      console.log(`   - ${c.name}: ${c.message}`);
+      if (c.fix) console.log(`     → ${c.fix}`);
+    }
+    process.exit(1);
+  }
+  console.log("0. doctor --strict: ok");
+
+  const pipeline = evaluatePipeline(repoRoot);
 
   if (pipeline.blockers.length) {
     console.log("1. Pipeline blockers:");
@@ -28,13 +42,14 @@ export function cmdShip(opts: { dryRun?: boolean }): void {
 
   console.log("1. Pipeline: ready");
 
-  const check = runCheck(repoRoot);
+  // Push-mode: HEAD trailers only (matches pre-push / agent ship checks).
+  const check = runCheck(repoRoot, { push: true });
   if (!check.allowed) {
-    console.error(`2. check: blocked — ${check.reason}`);
+    console.error(`2. check --push: blocked — ${check.reason}`);
     if (check.next) console.error(`   → ${check.next}`);
     process.exit(2);
   }
-  console.log("2. check: passed");
+  console.log("2. check --push: passed");
 
   if (config.requireTrailer) {
     if (opts.dryRun) {
@@ -54,10 +69,9 @@ export function cmdShip(opts: { dryRun?: boolean }): void {
   const session = readRangeSession(repoRoot);
   console.log("");
   console.log("Ready to ship:");
+  if (session) {
+    console.log("  know-code range seal   # before push");
+  }
   console.log("  git push");
   console.log("  gh pr create   # if using PR workflow");
-  if (session) {
-    console.log("");
-    console.log("After push: know-code range seal");
-  }
 }

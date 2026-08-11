@@ -55,7 +55,7 @@ Usage:
                  [--range-mode auto|index|range] [--range-seal receipt|rewrite]
   know-code config [--json] | config set <key> <value>
   know-code attest-init [--force] [--passphrase <secret>]
-  know-code doctor [--json]
+  know-code doctor [--json] [--strict]
   know-code range begin|status|seal|abort|continue [--from <ref>] [--rewrite] [--keep-seal] [--yes]
   know-code questions [--json] [--template] [--from <ref>] [--level …]
   know-code quiz validate [--path .know-code/quiz.json] [--json]
@@ -70,7 +70,8 @@ Usage:
   know-code reset [--keep-attest]
   know-code override
   know-code status [--json] [--next]
-  know-code hash|verify [--require-all] [--require-range-trailers] [--range-seal]
+  know-code hash [--explain] [--json]
+  know-code verify [--require-all] [--require-range-trailers] [--range-seal]
   know-code hooks install
   know-code hooks uninstall [--agents claude,cursor,codex]
   know-code skills [--global] [--agents …] [-y]
@@ -232,7 +233,9 @@ function main(): void {
         }).catch(failAsync);
         return;
       case "doctor":
-        void cmdDoctor(flags.json === true).catch(failAsync);
+        void cmdDoctor(flags.json === true, {
+          strict: flags.strict === true,
+        }).catch(failAsync);
         return;
       case "range":
         switch (subcommand) {
@@ -283,11 +286,11 @@ function main(): void {
         process.exit(1);
         break;
       case "check":
-        cmdCheck();
+        cmdCheck({ push: flags.push === true });
         break;
       case "ship":
-        cmdShip({ dryRun: flags["dry-run"] === true });
-        break;
+        void cmdShip({ dryRun: flags["dry-run"] === true }).catch(failAsync);
+        return;
       case "reset":
         cmdReset({ keepAttest: flags["keep-attest"] === true });
         break;
@@ -327,7 +330,10 @@ function main(): void {
         });
         break;
       case "hash":
-        cmdHash(flags.json === true);
+        cmdHash({
+          json: flags.json === true,
+          explain: flags.explain === true,
+        });
         break;
       case "verify":
         cmdVerify({
