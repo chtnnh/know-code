@@ -9,7 +9,7 @@ import { readConfig } from "./config.js";
 import { readGateSafe, writeGate } from "./gate.js";
 import { git } from "./git.js";
 import { knowCodeDir, sealedHeadBindingPath } from "./paths.js";
-import { readRangeSeal } from "./range.js";
+import { clearRangeSeal, readRangeSeal } from "./range.js";
 import { assertSigned, sealPayload } from "./seal.js";
 import type { GateReceipt, SealedHeadBindingReceipt } from "./types.js";
 
@@ -135,6 +135,59 @@ export async function bindGateSealedHead(
       bindingUnsigned as SealedHeadBindingReceipt,
     );
   }
+}
+
+/**
+ * Sealed tip already reachable from the remote base: the push the seal
+ * authorized has happened, so the seal is consumed. Only remote refs count —
+ * HEAD always descends from the sealed tip on the *local* branch, so a local
+ * check would treat every unpushed seal as consumed.
+ */
+function sealConsumedByRemote(repoRoot: string, sealedOid: string): boolean {
+  const base = `origin/${readConfig(repoRoot).baseBranch}`;
+  const baseOid = git(["rev-parse", "--verify", "--quiet", base], repoRoot, {
+    allowFail: true,
+  });
+  if (!baseOid) return false;
+  // merge-base(sealed, base) === sealed  ⇔  sealed is an ancestor of base.
+  const mb = git(["merge-base", sealedOid, base], repoRoot, {
+    allowFail: true,
+  });
+  return mb !== "" && mb === sealedOid;
+}
+
+/**
+ * Consume seal artifacts superseded by a fresh human pass. A new human-sealed
+ * gate re-attests the current work, so a stale range-seal/binding can only
+ * block legitimate shipping — it authorizes nothing the new gate does not.
+ *
+ * Superseded means: pinned to a commit other than HEAD, or pinned to a tip
+ * that is already on the remote base (the seal's push happened; the next
+ * batch starts with HEAD still at the sealed tip). Only a just-sealed,
+ * not-yet-pushed tip at HEAD is kept — it must stay rewrite-open for its
+ * pending push.
+ *
+ * SECURITY: callers must invoke this only after sealPayload succeeded (human
+ * TTY passphrase). Agent-runnable commands (range begin, check, hooks) must
+ * never call it — an agent unbinding a sealed HEAD is exactly the exploit the
+ * binding exists to stop.
+ */
+export function clearSupersededSealArtifacts(repoRoot: string): string[] {
+  const head = git(["rev-parse", "HEAD"], repoRoot, { allowFail: true });
+  const superseded = (oid: string): boolean =>
+    oid !== head || sealConsumedByRemote(repoRoot, oid);
+  const cleared: string[] = [];
+  const seal = readRangeSeal(repoRoot);
+  if (seal?.sealedHeadOid && superseded(seal.sealedHeadOid)) {
+    clearRangeSeal(repoRoot);
+    cleared.push("range-seal.json");
+  }
+  const binding = readSealedHeadBindingFile(repoRoot);
+  if (binding?.sealedHeadOid && superseded(binding.sealedHeadOid)) {
+    clearSealedHeadBindingFile(repoRoot);
+    cleared.push("sealed-head-binding.json");
+  }
+  return cleared;
 }
 
 /** Clears gate + binding file on abort (unsigned gates only; signed gates keep binding). */

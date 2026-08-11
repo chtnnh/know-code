@@ -9,6 +9,7 @@ import { materializedTreeOid, writeGate } from "../gate.js";
 import { hasUnstagedTrackedChanges, unstagedTrackedFileNames } from "../git.js";
 import { resolveQuizContext } from "../hash.js";
 import { findGitRoot } from "../paths.js";
+import { clearSupersededSealArtifacts } from "../range-seal-bind.js";
 import { sealPayload } from "../seal.js";
 import { isLevel, type GateReceipt } from "../types.js";
 
@@ -97,6 +98,17 @@ export async function cmdPass(opts: {
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
+  }
+
+  // Only after a successful human seal: a fresh pass supersedes range seals
+  // pinned to another commit or to an already-pushed tip, which would
+  // otherwise block shipping the newly gated work forever (non-range commit
+  // after a sealed range).
+  const cleared = clearSupersededSealArtifacts(repoRoot);
+  if (cleared.length > 0) {
+    console.log(
+      `know-code: cleared superseded seal artifacts: ${cleared.join(", ")}`,
+    );
   }
 
   console.log(`know-code: gate sealed (${level}, scope=${ctx.scope})`);

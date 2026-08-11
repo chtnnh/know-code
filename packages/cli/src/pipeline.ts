@@ -227,8 +227,8 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
       blockers.push({
         step: "pass",
         message:
-          "HEAD moved after range seal — start a new range or re-run pass",
-        command: "know-code range begin",
+          "HEAD moved after range seal — re-run taught → quiz → pass (a fresh pass clears the stale seal)",
+        command: "know-code taught",
       });
     } else if (!isSignedGateEffective(repoRoot, gate, state, config.level)) {
       blockers.push({
