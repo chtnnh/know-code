@@ -8,6 +8,7 @@ dist/
 coverage/
 .turbo/
 .tmp-test/
+.wrangler/
 
 # Local know-code state (per developer — not committed)
 .know-code/

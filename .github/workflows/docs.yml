@@ -1,10 +1,13 @@
 name: docs
 
-# Docs deploy only on release tags (or manual dispatch) so the site always
-# matches a published CLI version, not main's tip.
+# `/` is the latest frozen release (versioned_docs). `/HEAD/` is website/docs
+# from main, so unreleased pages go live without becoming the default.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths:
+      - "website/**"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
@@ -28,6 +31,8 @@ jobs:
           cache: npm
 
       - name: Install and build site
+        env:
+          UMAMI_WEBSITE_ID: ${{ vars.UMAMI_WEBSITE_ID }}
         run: |
           npm install
           npm run build -w website

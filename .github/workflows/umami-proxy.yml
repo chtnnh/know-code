@@ -1,0 +1,36 @@
+name: umami-proxy
+
+# Same-origin Umami Worker. Independent of docs tags — the proxy is infra,
+# not a published CLI version. Path filter keeps it off the hot path.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/umami-proxy/**"
+      - ".github/workflows/umami-proxy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: umami-proxy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: infra/umami-proxy
+          secrets: |
+            UMAMI_ORIGIN
+        env:
+          UMAMI_ORIGIN: ${{ secrets.UMAMI_ORIGIN }}

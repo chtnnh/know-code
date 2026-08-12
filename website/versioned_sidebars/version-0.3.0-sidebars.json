@@ -1,0 +1,18 @@
+{
+  "docsSidebar": [
+    "intro",
+    "tutorial",
+    "how-it-works",
+    "workflows",
+    "config",
+    "quiz",
+    "grading",
+    "skills",
+    "cli",
+    "levels",
+    "hooks",
+    "ci",
+    "team",
+    "troubleshooting"
+  ]
+}

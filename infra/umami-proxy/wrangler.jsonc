@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "kc-umami-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-11",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "kc.chtnnhfoundation.org/s/*",
+      "zone_name": "chtnnhfoundation.org"
+    }
+  ]
+}
