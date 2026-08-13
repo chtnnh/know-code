@@ -117,7 +117,7 @@ know-code commit -m "fix(cli): thing"
 ## Hash changed / scope confusion
 
 - **Index scope:** hash = empty-tree → index (staged + HEAD tree). Syncing `origin/main` without staging changes usually does not change it.
-- **Range scope:** hash = cumulative `fromOid...HEAD` while `range begin` is active. See `know-code config --json`.
+- **Range scope:** hash = tree of range start → `write-tree` while `range begin` is active. See `know-code config --json`.
 
 ## After `range seal --rewrite`
 

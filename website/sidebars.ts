@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
     "levels",
     "hooks",
     "ci",
+    "verify",
     "team",
     "troubleshooting",
   ],

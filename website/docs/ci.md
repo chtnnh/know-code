@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: chtnnh/know-code/action@v0.3.0
         with:
@@ -51,13 +52,15 @@ there is no range to recompute — which is why the workflow runs on
 
 ## What verify checks
 
-Default `know-code verify` (one CI command for all merge styles):
+Default `know-code verify` (one CI command for all merge styles). CI only sees **public git** — not gitignored `.know-code/` seals.
 
-1. **HEAD trailer** must match one of:
-   - **merge-base..HEAD** — cumulative diff since the base branch (range batches, squash merges, PR tips)
+1. **HEAD trailer** must match a **grounded** candidate:
+   - **merge-base..HEAD** — tree-canonical range hash (fromOid tree → `write-tree`)
    - **index** — empty-tree → current tree (single-commit / hotfix)
-   - **range-seal** or **uniform-trailers** — when present locally
+   - **uniform-trailers** — only when every commit’s trailer is already a grounded candidate
 2. **Fallback:** any commit in `merge-base..HEAD` carries a matching trailer (pre-squash PR branches).
+
+Do **not** rely on local `range-seal` / `commit-drift` for green CI. Checkout the PR tip SHA, not the ephemeral merge commit. Full design: [Verification design](verify.md).
 
 Squash merges only need the **squash commit** to carry a trailer for the combined diff — intermediate commits are not checked.
 

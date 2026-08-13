@@ -9,7 +9,9 @@ import {
 } from "./git-env.js";
 import { hasStagedChanges, knowCodeGitEnv } from "./git.js";
 import { materializedTreeOid } from "./gate.js";
+import { computeDiffContext, computeRangeDiffContext } from "./hash.js";
 import { git, withTempRepo, writeFile } from "./test-helpers.js";
+import { DEFAULT_CONFIG } from "./types.js";
 
 describe("git-env", () => {
   it("configValueBypassesHooks detects hooksPath and include.path", () => {
@@ -81,12 +83,23 @@ describe("git-env", () => {
       assert.equal(materializedTreeOid(root), fullTree);
       assert.equal(hasStagedChanges(root), true);
 
+      const cfg = { ...DEFAULT_CONFIG, level: "lite" as const };
+      const fromOid = git(root, ["rev-parse", "HEAD"]);
+      const rangeHash = computeRangeDiffContext(root, cfg, fromOid).diffHash;
+      const indexHash = computeDiffContext(root, cfg).diffHash;
+
       // During the commit git also holds .git/index.lock — write-tree must
-      // still resolve the real tree (temp-copy fallback).
+      // still resolve the real tree (temp-copy fallback). Hashing must too:
+      // raw write-tree + EMPTY_TREE fallback would mint a wrong range/index hash.
       const lockPath = join(root, ".git", "index.lock");
       execFileSync("touch", [lockPath]);
       try {
         assert.equal(materializedTreeOid(root), fullTree);
+        assert.equal(
+          computeRangeDiffContext(root, cfg, fromOid).diffHash,
+          rangeHash,
+        );
+        assert.equal(computeDiffContext(root, cfg).diffHash, indexHash);
       } finally {
         execFileSync("rm", ["-f", lockPath]);
       }

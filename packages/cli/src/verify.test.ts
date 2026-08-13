@@ -60,8 +60,8 @@ describe("verify hash candidates", () => {
     }
   });
 
-  it("accepts commit-drift passHash only with grounded gate + gatedTreeOid", () => {
-    const repo = mkdtempSync(join(tmpdir(), "kc-verify-drift-"));
+  it("pass-time range trailer matches merge-base..HEAD without commit-drift", () => {
+    const repo = mkdtempSync(join(tmpdir(), "kc-verify-stable-pass-"));
     try {
       git(repo, ["init", "-b", "main", "--template="]);
       git(repo, ["config", "user.email", "t@test"]);
@@ -108,9 +108,14 @@ describe("verify hash candidates", () => {
       ]);
 
       const candidates = collectVerifyHashCandidates(repo, cfg);
-      const drift = candidates.find((c) => c.label === "commit-drift");
-      assert.ok(drift);
-      assert.equal(drift!.hash, passHash);
+      // Tree-canonical: no commit-drift needed — tip hash equals pass hash.
+      assert.equal(
+        candidates.find((c) => c.label === "commit-drift"),
+        undefined,
+      );
+      const range = candidates.find((c) => c.label === "merge-base..HEAD");
+      assert.ok(range);
+      assert.equal(range!.hash, passHash);
       const match = matchHeadTrailer(repo, "HEAD", candidates);
       assert.ok(match);
       assert.equal(match!.hash, passHash);
@@ -341,6 +346,64 @@ describe("verify hash candidates", () => {
       assert.ok(index);
       assert.ok(range);
       assert.notEqual(index!.hash, range!.hash);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("range hash is stable across staged → committed (CI dogfood)", () => {
+    const repo = mkdtempSync(join(tmpdir(), "kc-verify-stable-"));
+    try {
+      git(repo, ["init", "-b", "main", "--template="]);
+      git(repo, ["config", "user.email", "t@test"]);
+      git(repo, ["config", "user.name", "t"]);
+      mkdirSync(join(repo, ".know-code"), { recursive: true });
+      writeFileSync(
+        join(repo, ".know-code", "config.json"),
+        JSON.stringify({
+          ...DEFAULT_CONFIG,
+          level: "lite",
+          rangeMode: "range",
+        }),
+      );
+      writeFileSync(join(repo, "f.txt"), "base\n");
+      git(repo, ["add", "f.txt"]);
+      git(repo, ["commit", "-m", "base"]);
+      const fromOid = git(repo, ["rev-parse", "HEAD"]);
+
+      writeFileSync(join(repo, "g.txt"), "feature\n");
+      git(repo, ["add", "g.txt"]);
+      const stagedHash = computeRangeDiffContext(
+        repo,
+        { ...DEFAULT_CONFIG, level: "lite", rangeMode: "range" },
+        fromOid,
+      ).diffHash;
+
+      git(repo, [
+        "commit",
+        "-m",
+        `feat\n\nKnow-Code-Verified: ${stagedHash}\n`,
+      ]);
+
+      const committedHash = computeRangeDiffContext(
+        repo,
+        { ...DEFAULT_CONFIG, level: "lite", rangeMode: "range" },
+        fromOid,
+      ).diffHash;
+      assert.equal(committedHash, stagedHash);
+
+      // CI has no seal artifacts — only grounded candidates.
+      const candidates = collectVerifyHashCandidates(repo, {
+        ...DEFAULT_CONFIG,
+        level: "lite",
+      });
+      assert.ok(
+        candidates.some((c) => c.hash === stagedHash),
+        "pass-time trailer must be among CI verify candidates",
+      );
+      const match = matchHeadTrailer(repo, "HEAD", candidates);
+      assert.ok(match);
+      assert.equal(match!.hash, stagedHash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

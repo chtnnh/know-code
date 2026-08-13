@@ -1,9 +1,9 @@
 name: know-code verify
 description: >-
-  Verify Know-Code-Verified commit trailers. Primary check: HEAD message
-  matches the current tree hash (empty-tree→index). Secondary: trailers on
-  commits ahead of the base branch. Use on pull_request only — on a direct
-  push to the base branch there is no merge-base range to verify.
+  Verify Know-Code-Verified commit trailers against grounded tree hashes
+  (index and merge-base→write-tree). Callers must checkout the PR tip
+  (ref: github.event.pull_request.head.sha) with fetch-depth: 0 — the
+  default merge commit has no trailers. Use on pull_request only.
 author: chtnnh
 branding:
   icon: shield

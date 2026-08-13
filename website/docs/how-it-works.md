@@ -62,9 +62,9 @@ Typical batch:
 3. Agent lands logical commits with **plain `git commit`** while the gate is open.
 4. You `range seal --rewrite` to stamp `Know-Code-Verified` on every commit, then push.
 
-**Commit drift:** after `pass`, the range hash moves as commits land, but the gate stays open while the tree matches `gatedTreeOid` from pass time. That's what makes multi-commit batches work without re-quizzing.
+**Tree-stable range hash:** after `pass`, committing the same gated tree keeps the range hash identical (staged-at-pass === tip tree). The gate stays open while the tree matches `gatedTreeOid`. Legacy gates or tree edits may still surface as commit-drift locally — that is not the happy path for CI.
 
-Single-commit hotfix? Skip `range begin` — the hash covers the staged index only. See [Workflows](workflows.md).
+Single-commit hotfix? Skip `range begin` — the hash covers the staged index only. See [Workflows](workflows.md) and [Verification design](verify.md).
 
 ## What blocks commit and push
 
@@ -95,7 +95,7 @@ The quiz always binds to a **hash of the diff** you're about to ship.
 | Mode | When | Hash covers |
 |------|------|-------------|
 | **Index** | No active range session (or `rangeMode: index`) | Empty tree → current index (staged + HEAD tree) |
-| **Range** | `range begin` active (or `rangeMode: range`) | Cumulative diff from merge-base through HEAD + staged |
+| **Range** | `range begin` active (or `rangeMode: range`) | Tree of range start → `write-tree` (HEAD + staged; same after commit) |
 
 ```bash
 know-code hash
@@ -110,7 +110,7 @@ know-code config --json    # shows active scope
 | **tipHash** | Current `know-code hash` (may differ after commits) |
 | **trailerHash** | Value in `Know-Code-Verified:` on commit messages |
 
-**Commit drift:** after `pass`, the agent may land several commits. `tipHash` moves with each commit, but the **tree** can stay the same. The gate stays open via `gatedTreeOid` (tree OID recorded at pass) until you change staged content or the working tree.
+**Tree-stable tip:** after `pass`, the agent may land several commits. With the tree-canonical formula, `tipHash` matches `passHash` while the gated tree is unchanged. The gate stays open via `gatedTreeOid` until you change staged content or the working tree. `commitDrift` is for legacy/mismatched gates — not what CI uses.
 
 ```mermaid
 flowchart LR

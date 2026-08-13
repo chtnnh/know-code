@@ -3,6 +3,7 @@ import { readConfig } from "./config.js";
 import {
   currentHead,
   git,
+  indexTreeOid,
   mergeBase,
   resolveBaseRef,
   revListCount,
@@ -36,8 +37,7 @@ export function computeDiffContext(
     rangeFrom = committed.trim() ? mb : EMPTY_TREE;
   }
 
-  const indexTree =
-    git(["write-tree"], repoRoot, { allowFail: true }) || EMPTY_TREE;
+  const indexTree = indexTreeOid(repoRoot) || EMPTY_TREE;
   const diff = git(["diff", EMPTY_TREE, indexTree], repoRoot, {
     allowFail: true,
   });
@@ -51,7 +51,14 @@ export function computeDiffContext(
   };
 }
 
-/** Cumulative hash for fromOid..HEAD plus staged changes. */
+/**
+ * Cumulative hash for fromOid → current index tree (HEAD + staged).
+ *
+ * Tree-canonical on purpose: the same resulting tree must hash the same whether
+ * the delta is still staged or already committed. Otherwise CI `verify` (no
+ * local range-seal / gate.json) cannot match a pass-time trailer after
+ * `know-code commit` lands the quiz tree — the classic dogfood gap.
+ */
 export function computeRangeDiffContext(
   repoRoot: string,
   config: Config,
@@ -62,20 +69,22 @@ export function computeRangeDiffContext(
   const headLabel = headRef === EMPTY_TREE ? "HEAD" : headRef;
   const commitCount = revListCount(repoRoot, fromOid, headLabel);
 
-  const rangeDiff = git(["diff", `${fromOid}...HEAD`], repoRoot, {
+  const fromTree =
+    fromOid === EMPTY_TREE
+      ? EMPTY_TREE
+      : git(["rev-parse", `${fromOid}^{tree}`], repoRoot, { allowFail: true }) ||
+        EMPTY_TREE;
+  const indexTree = indexTreeOid(repoRoot) || EMPTY_TREE;
+  const diff = git(["diff", fromTree, indexTree], repoRoot, {
     allowFail: true,
   });
-  const staged = git(["diff", "--cached"], repoRoot, { allowFail: true });
-  const material = staged.trim()
-    ? `diff:${rangeDiff}\nstaged:${staged}`
-    : `diff:${rangeDiff}`;
 
   return {
     baseRef,
     headRef: headRef === EMPTY_TREE ? EMPTY_TREE : headRef,
     commitRange: `${fromOid}..${headLabel}`,
-    diff: staged.trim() ? `${rangeDiff}\n---staged---\n${staged}` : rangeDiff,
-    diffHash: sha256(material),
+    diff,
+    diffHash: sha256(`diff:${diff}`),
     scope: "range",
     rangeFromOid: fromOid,
     commitCount,
