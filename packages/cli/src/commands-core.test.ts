@@ -257,6 +257,8 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
     // Push-to-base has no merge-base ahead of HEAD — verify must be PR-only.
     assert.match(yml, /pull_request:/);
     assert.doesNotMatch(yml, /push:/);
+    // Default PR checkout is a merge commit without trailers — pin the tip.
+    assert.match(yml, /github\.event\.pull_request\.head\.sha/);
   });
 
   it("validateQuiz happy and sad", () => {

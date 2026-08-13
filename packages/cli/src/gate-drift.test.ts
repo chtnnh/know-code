@@ -167,22 +167,22 @@ describe("gate survives commit when tree unchanged (range drift)", () => {
       ...DEFAULT_CONFIG,
       rangeMode: "range",
     });
-    assert.notEqual(afterCommit.diffHash, hash);
+    // Tree-canonical range hash: staged-at-pass === committed tip.
+    assert.equal(afterCommit.diffHash, hash);
     assert.equal(materializedTreeOid(repoRoot), gatedTreeOid);
 
-    const drift = resolveEffectiveQuizState(repoRoot);
-    assert.equal(drift.commitDrift, true);
-    assert.equal(drift.effectiveHash, hash);
+    const after = resolveEffectiveQuizState(repoRoot);
+    assert.equal(after.commitDrift, false);
+    assert.equal(after.effectiveHash, hash);
     assert.equal(readGate(repoRoot)!.gatedTreeOid, gatedTreeOid);
     assert.equal(runCheck(repoRoot).allowed, true);
 
-    const cfg = { ...DEFAULT_CONFIG, level: "lite" as const, rangeMode: "range" as const };
     assert.equal(
       isSignedGateOpen(repoRoot, readGate(repoRoot), afterCommit.diffHash, "lite"),
-      false,
+      true,
     );
     assert.equal(
-      isSignedGateEffective(repoRoot, readGate(repoRoot), drift, "lite"),
+      isSignedGateEffective(repoRoot, readGate(repoRoot), after, "lite"),
       true,
     );
   });
@@ -280,7 +280,8 @@ describe("gate survives commit when tree unchanged (range drift)", () => {
 
     assert.equal(materializedTreeOid(repoRoot), gatedTreeOid);
     const mid = resolveEffectiveQuizState(repoRoot);
-    assert.equal(mid.commitDrift, true);
+    // Index tree still equals gated tree → range hash unchanged (no drift).
+    assert.equal(mid.commitDrift, false);
     assert.equal(mid.effectiveHash, hash);
     assert.equal(runCheck(repoRoot).allowed, true);
 
@@ -295,7 +296,7 @@ describe("gate survives commit when tree unchanged (range drift)", () => {
 
     assert.equal(materializedTreeOid(repoRoot), gatedTreeOid);
     const done = resolveEffectiveQuizState(repoRoot);
-    assert.equal(done.commitDrift, true);
+    assert.equal(done.commitDrift, false);
     assert.equal(runCheck(repoRoot).allowed, true);
   });
 });

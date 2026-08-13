@@ -23,3 +23,9 @@ jobs:
         env:
           KNOW_CODE_ATTEST_PASSPHRASE: ci-smoke-attest-passphrase
           KNOW_CODE_ATTEST_HOME: ${{ runner.temp }}/know-code-attest
+
+      - name: CLI smoke (CI verify, no local seals)
+        run: npm run smoke:verify
+        env:
+          KNOW_CODE_ATTEST_PASSPHRASE: ci-smoke-verify-passphrase
+          KNOW_CODE_ATTEST_HOME: ${{ runner.temp }}/know-code-verify-attest

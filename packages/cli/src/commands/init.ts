@@ -27,6 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: \${{ github.event.pull_request.head.sha }}
 
       - uses: ${ACTION_REF}
         with:
