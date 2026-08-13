@@ -3,6 +3,7 @@ import { readConfig } from "./config.js";
 import {
   currentHead,
   git,
+  indexTreeOid,
   mergeBase,
   resolveBaseRef,
   revListCount,
@@ -36,8 +37,7 @@ export function computeDiffContext(
     rangeFrom = committed.trim() ? mb : EMPTY_TREE;
   }
 
-  const indexTree =
-    git(["write-tree"], repoRoot, { allowFail: true }) || EMPTY_TREE;
+  const indexTree = indexTreeOid(repoRoot) || EMPTY_TREE;
   const diff = git(["diff", EMPTY_TREE, indexTree], repoRoot, {
     allowFail: true,
   });
@@ -74,8 +74,7 @@ export function computeRangeDiffContext(
       ? EMPTY_TREE
       : git(["rev-parse", `${fromOid}^{tree}`], repoRoot, { allowFail: true }) ||
         EMPTY_TREE;
-  const indexTree =
-    git(["write-tree"], repoRoot, { allowFail: true }) || EMPTY_TREE;
+  const indexTree = indexTreeOid(repoRoot) || EMPTY_TREE;
   const diff = git(["diff", fromTree, indexTree], repoRoot, {
     allowFail: true,
   });

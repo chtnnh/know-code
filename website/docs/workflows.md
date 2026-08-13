@@ -84,10 +84,10 @@ Hooks gate `gh pr create` and `glab mr create`. Complete the quiz pipeline **bef
 
 | Mode | When | What happens |
 |------|------|--------------|
-| **receipt** | Trailer on tip commit is enough for CI | Writes signed `range-seal.json` |
-| **rewrite** | CI requires trailer on **every** commit (dogfooding default) | `range seal --rewrite` rewrites messages + `git push --force-with-lease` |
+| **receipt** | Trailer on the **tip** is enough for CI | Writes signed `range-seal.json` (local only; CI ignores it) |
+| **rewrite** | Every commit in the range must share the same trailer | `range seal --rewrite` rewrites messages + `git push --force-with-lease` |
 
-This repo dogfoods **rewrite**. Use `verify --require-range-trailers` in CI when using rewrite.
+This repo’s `know-code.yml` is **receipt**: `know-code verify` on the PR tip. Opt into `--require-range-trailers` only when you also rewrite.
 
 ## When to `range abort`
 

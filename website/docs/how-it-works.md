@@ -95,7 +95,7 @@ The quiz always binds to a **hash of the diff** you're about to ship.
 | Mode | When | Hash covers |
 |------|------|-------------|
 | **Index** | No active range session (or `rangeMode: index`) | Empty tree → current index (staged + HEAD tree) |
-| **Range** | `range begin` active (or `rangeMode: range`) | Tree diff fromOid^{tree} → `write-tree` (HEAD + staged; same after commit) |
+| **Range** | `range begin` active (or `rangeMode: range`) | Tree of range start → `write-tree` (HEAD + staged; same after commit) |
 
 ```bash
 know-code hash

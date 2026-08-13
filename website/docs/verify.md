@@ -51,7 +51,11 @@ Covers **HEAD + staged** as one tree. Used when `rangeMode` is off or no range s
 
 ### Range (active `range begin` or `rangeMode: range`)
 
-`sha256("diff:" + git diff fromOid^{tree} write-tree)`
+```text
+sha256("diff:" + git diff FROM_TREE INDEX_TREE)
+```
+
+`FROM_TREE` is the tree of the range start commit. `INDEX_TREE` is `git write-tree` (HEAD plus staged).
 
 **Tree-canonical:** the same resulting tree hashes the same whether the delta is still staged or already committed. That is required for receipt-mode CI: `know-code commit` stamps the pass-time hash, and CI must recompute that hash from history alone (no `staged:` material, no local seal).
 
@@ -105,7 +109,7 @@ npm run build
 npm run smoke:verify
 ```
 
-[`scripts/smoke-verify-ci.sh`](https://github.com/chtnnh/know-code/blob/main/scripts/smoke-verify-ci.sh) runs a full range quiz → `know-code commit`, then **deletes** gate/seal/taught artifacts and asserts `know-code verify` still exits 0. A forged trailer must fail.
+`scripts/smoke-verify-ci.sh` runs a full range quiz → `know-code commit`, then **deletes** gate/seal/taught artifacts and asserts `know-code verify` still exits 0. A forged trailer must fail.
 
 ## See also
 

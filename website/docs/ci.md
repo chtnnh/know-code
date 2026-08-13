@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: chtnnh/know-code/action@v0.3.0
         with:
@@ -59,7 +60,7 @@ Default `know-code verify` (one CI command for all merge styles). CI only sees *
    - **uniform-trailers** — only when every commit’s trailer is already a grounded candidate
 2. **Fallback:** any commit in `merge-base..HEAD` carries a matching trailer (pre-squash PR branches).
 
-Do **not** rely on local `range-seal` / `commit-drift` for green CI. Checkout the PR tip (`ref: ${{ github.event.pull_request.head.sha }}`), not the ephemeral merge commit. Full design: [Verification design](verify.md).
+Do **not** rely on local `range-seal` / `commit-drift` for green CI. Checkout the PR tip SHA, not the ephemeral merge commit. Full design: [Verification design](verify.md).
 
 Squash merges only need the **squash commit** to carry a trailer for the combined diff — intermediate commits are not checked.
 
