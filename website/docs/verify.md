@@ -86,7 +86,7 @@ Sliced pathspec commits keep the same range hash while the index tree still equa
 sha256("diff:" + git diff FROM_TREE TO_TREE)
 ```
 
-`FROM_TREE` / `TO_TREE` are the trees of the run start parent and run tip. A dirty index cannot change this. A run with exactly one non-merge commit (optional trailerless merges attached) also accepts the empty-tree → run-tip hash.
+`FROM_TREE` / `TO_TREE` are the trees of the run start parent and the **last non-merge** in the run (the feature tip the trailer was stamped on). Attached trailerless merges stay in the run but are not the hash tip — otherwise a GitHub merge commit after `main` moved would include unrelated mainline files. A dirty index cannot change this. A run with exactly one non-merge commit (optional trailerless merges attached) also accepts the empty-tree → last-non-merge hash.
 
 ## What `verify` accepts
 
@@ -107,7 +107,7 @@ Match order: HEAD trailer against candidates; if missing, scan trailers in `merg
 | Mode | Trailer on commits | PR job | Push job |
 |------|--------------------|--------|----------|
 | **receipt** (default here after tree-canonical hash) | Pass-time hash from `know-code commit` on the **tip** | Tip (or ancestor) trailer ∈ grounded candidates | Every **non-merge** in `before..HEAD` needs a trailer. GitHub **squash** (one landing) passes; a merge-commit of a tip-only PR fails |
-| **rewrite** | `range seal --rewrite` stamps tip hash on every commit | Same; `--require-range-trailers` if you want that enforced on the PR | One run; tree-pair is parent-of-first → last (plus attached merges) |
+| **rewrite** | `range seal --rewrite` stamps tip hash on every commit | Same; `--require-range-trailers` if you want that enforced on the PR | One run; tree-pair is parent-of-first → last non-merge (attached merges ignored for the hash) |
 
 ## GitHub merge methods
 
@@ -151,7 +151,7 @@ After a push to the base branch, `origin/main` **is** HEAD. There is no merge-ba
 2. Exit 0 if `<oid>` is HEAD (warns `--from` is HEAD) or the zero SHA (nothing to walk).
 3. Walk `from..HEAD` oldest-first (`rev-list --reverse --topo-order`).
 4. Split into **runs** that share the same `Know-Code-Verified` hash. Merge commits with no trailer **attach** to the current run. A linear commit with no trailer **fails**. A merge with no current run **fails**.
-5. Each run hashes the parent-of-first tree against the run-tip tree (`computeTreePairHash` — historical trees, not live `write-tree`). The trailer must match that pair, **or** the same tip against a first-parent ancestor of the run start (a range that began before the previous landing — second push in the same session). A run with **exactly one non-merge** commit (optional trailerless merges attached) also accepts the empty-tree (index) hash of the run tip.
+5. Each run hashes the parent-of-first tree against the **last non-merge** (`computeTreePairHash` — historical trees, not live `write-tree`). Trailerless merges attach to the run but are not the hash tip, so an outdated PR landed with “Create a merge commit” still matches. The trailer must match that pair, **or** the same feature tip against a first-parent ancestor of the run start (a range that began before the previous landing — second push in the same session). A run with **exactly one non-merge** commit also accepts the empty-tree (index) hash of that feature tip.
 
 Several landings in one push (stacked squashes) are **separate** runs. The combined `before..HEAD` patch is not a candidate — it would not match any per-range trailer.
 

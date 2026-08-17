@@ -115,22 +115,30 @@ function nonMergeOids(repoRoot: string, oids: string[]): string[] {
   return oids.filter((oid) => parentCount(repoRoot, oid) <= 1);
 }
 
+/**
+ * Tree the trailer was stamped against: last non-merge in the run.
+ * Attached trailerless merges (GitHub "Create a merge commit") stay in
+ * `toOid` for bookkeeping but must not be the hash tip — when `main`
+ * moved, the merge tree includes unrelated mainline files.
+ */
+function segmentHashToOid(repoRoot: string, segment: WalkSegment): string {
+  const linear = nonMergeOids(repoRoot, segment.oids);
+  return linear[linear.length - 1] ?? segment.toOid;
+}
+
 /** Grounded hashes a run's trailer may match. */
 export function groundedHashesForSegment(
   repoRoot: string,
   segment: WalkSegment,
 ): { rangeHash: string; indexHash?: string; hashes: string[] } {
-  const rangeHash = computeTreePairHash(
-    repoRoot,
-    segment.fromOid,
-    segment.toOid,
-  );
+  const hashTo = segmentHashToOid(repoRoot, segment);
+  const rangeHash = computeTreePairHash(repoRoot, segment.fromOid, hashTo);
   const seen = new Set<string>([rangeHash]);
   let indexHash: string | undefined;
   // One logical landing: a single non-merge, optionally plus trailerless
   // merges glued on (GitHub "Create a merge commit" of a 1-commit PR).
   if (nonMergeOids(repoRoot, segment.oids).length === 1) {
-    indexHash = computeTreePairHash(repoRoot, EMPTY_TREE, segment.toOid);
+    indexHash = computeTreePairHash(repoRoot, EMPTY_TREE, hashTo);
     seen.add(indexHash);
   }
   // Same range session, later push: trailer is still range-begin → tip,
@@ -141,7 +149,7 @@ export function groundedHashesForSegment(
     const parent = firstParentOid(repoRoot, a);
     if (!parent || parent === EMPTY_TREE || visited.has(parent)) break;
     visited.add(parent);
-    seen.add(computeTreePairHash(repoRoot, parent, segment.toOid));
+    seen.add(computeTreePairHash(repoRoot, parent, hashTo));
     a = parent;
   }
   return { rangeHash, indexHash, hashes: [...seen] };

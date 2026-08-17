@@ -104,7 +104,7 @@ run N … does not match tree pair
 ```
 
 - **No trailer on a linear commit:** receipt-mode range (tip only) landed via merge or rebase-and-merge. Squash instead, or `range seal --rewrite` so every commit carries the tip hash. The trailer must start at column 0 (GitHub’s default squash hoist does; local `git merge --squash` indents the body).
-- **Trailer does not match the tree-pair:** the landing tree changed, or you expected one hash for a stacked push. Each run is hashed separately; the combined `before..HEAD` patch is not a candidate. A second push in the **same** range session is OK: the walker also tries the tip against ancestors of the previous landing (the original `range begin`).
+- **Trailer does not match the tree-pair:** the landing tree changed, or you expected one hash for a stacked push. Each run is hashed separately; the combined `before..HEAD` patch is not a candidate. A second push in the **same** range session is OK: the walker also tries the tip against ancestors of the previous landing (the original `range begin`). A GitHub merge commit after `main` moved is hashed to the feature tip (last non-merge), not the merge tree — if that still fails, the merge edited feature files.
 - **Not an ancestor:** the push rewrote history (`before` is not in `HEAD`’s ancestry). Fail closed.
 - **All-zeros `before`:** new branch — the job skips the walk on purpose.
 

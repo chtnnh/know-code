@@ -72,7 +72,7 @@ The **PR** job runs on the **PR tip**. The **push** job runs on the landing comm
 - **Update branch** (merge `main` into the PR): HEAD is a merge commit with no trailer. PR verify still passes: it scans `merge-base..HEAD` and the tree-canonical hash is unchanged if only unrelated `main` files were added.
 - **Rebase and merge** / author `git rebase origin/main`: replayed commits keep the original `Know-Code-Verified` line. The hash against the **new** merge-base still matches. Push walk requires a trailer on every replayed non-merge commit (rewrite or each commit already trailered).
 - **Squash and merge**: PR verify already passed on the multi-commit PR. Push verify checks the squash commit. GitHub’s default squash message often copies the trailer onto that landing; the `PR_TITLE` + `BLANK` preset does not — that fails the **push** job, not the PR job.
-- **Create a merge commit**: PR job same as Update branch if HEAD has no trailer — range fallback. Push walk attaches the merge to the PR-side run; every non-merge in `before..HEAD` still needs a trailer.
+- **Create a merge commit**: PR job same as Update branch if HEAD has no trailer — range fallback. Push walk attaches the merge to the PR-side run but hashes the last non-merge (feature tip), so the landing still matches after `main` moved. Every non-merge in `before..HEAD` still needs a trailer.
 
 After any of those land on `main`, bare `know-code verify` cannot succeed (`on base tip`). The push job uses `--from` instead. Details: [Verification design](verify.md#github-merge-methods) and [Push walk](verify.md#push-walk).
 

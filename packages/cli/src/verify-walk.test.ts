@@ -307,6 +307,44 @@ describe("verify --from walk", () => {
     }
   });
 
+  it("accepts a merge landing after main moved (hash last non-merge, not merge tree)", () => {
+    const repo = initLab("kc-walk-merge-stale-");
+    try {
+      const base = commitFile(repo, "a.txt", "0\n", "base");
+      git(repo, ["checkout", "-b", "feat"]);
+      commitFile(repo, "feat.txt", "f\n", "feat");
+      let tip = git(repo, ["rev-parse", "HEAD"]);
+      const h = computeTreePairHash(repo, base, tip);
+      tip = stampTrailer(repo, h, "feat");
+      git(repo, ["checkout", "main"]);
+      const before = commitFile(repo, "main.txt", "moved\n", "main moved");
+      git(repo, [
+        "merge",
+        "--no-ff",
+        tip,
+        "-m",
+        "Merge pull request #1 from owner/feat\n\nfeat",
+      ]);
+      const merge = git(repo, ["rev-parse", "HEAD"]);
+      assert.notEqual(computeTreePairHash(repo, base, merge), h);
+
+      const part = partitionPushWalk(repo, before, merge);
+      assert.equal(part.ok, true);
+      if (!part.ok) return;
+      assert.equal(part.segments.length, 1);
+      assert.equal(part.segments[0].toOid, merge);
+      const grounded = groundedHashesForSegment(repo, part.segments[0]);
+      assert.equal(grounded.rangeHash, h);
+      assert.equal(grounded.indexHash, computeTreePairHash(repo, EMPTY_TREE, tip));
+
+      const result = runVerify(repo, { from: before });
+      assert.equal(result.ok, true, result.errors.join("\n"));
+      assert.match(result.messages.join("\n"), /tree-pair/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it("rejects a forged trailer and ignores a dirty index", () => {
     const repo = initLab("kc-walk-forge-");
     try {
