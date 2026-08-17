@@ -37,7 +37,7 @@ This installs two identical binaries: `know-code` and the short alias **`kc`** â
 | `know-code amend` | Amend with gate check + trailer |
 | `know-code reset` | Clear stale `.know-code` artifacts |
 | `know-code override` | Human TTY: one-shot emergency allow |
-| `know-code verify` | Trailer verification (see flags below) |
+| `know-code verify` | Trailer verification (`--from` for push walks; see [Verification design](verify.md)) |
 | `know-code hooks install` | Install or refresh git pre-commit/pre-push hooks |
 | `know-code hooks uninstall` | Remove git/agent hooks |
 | `know-code skills [--global]` | Install Agent Skills |
@@ -81,6 +81,17 @@ git push
 **Agents (0.3.0+):** shell hooks deny raw `git add`, amend, merge/pull/rebase, pathspec commits, and hook bypasses. Humans stage outside the agent; agents use `know-code commit` / `amend` after pass. See [Hooks](hooks.md).
 
 **Before push:** `know-code doctor --strict` or `know-code ship`.
+
+## `verify` flags
+
+| Flag | Meaning |
+|------|---------|
+| `--from <oid>` | Push walk: previous tip (`github.event.before`). Omit on PRs. |
+| `--require-all` | Stricter missing-trailer messaging (PR path) |
+| `--require-range-trailers` | Every commit in merge-base..HEAD shares the same trailer (rewrite / PR) |
+| `--range-seal` | Check local signed `range-seal.json` (not used in CI) |
+
+`--from` without a SHA is an error. All-zeros SHA skips the walk (new branch). Details: [Verification design](verify.md).
 
 ## Environment
 

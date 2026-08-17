@@ -84,7 +84,7 @@ flowchart TB
 | **Agent shell hooks** | Agent tries `git commit`, `git add`, `git merge`, … | Deny bypass patterns; run `know-code check` for allowed paths |
 | **Git pre-commit** | Any `git commit` / `know-code commit` | Gate open, trailer grounded, tree matches `gatedTreeOid` |
 | **Git pre-push** | `git push` | Trailer on HEAD, tree still matches gate |
-| **CI `verify`** | Pull request / push to main | `Know-Code-Verified` hash matches computed diff |
+| **CI `verify`** | Pull request / push to main | PR: trailer matches merge-base..HEAD (or index). Push: `--from` previous tip, per-run tree-pair |
 
 If commit is blocked after you passed, run `know-code status` — usually the diff changed (new edits, unstaged files, or legacy gate without `gatedTreeOid`).
 
@@ -110,7 +110,7 @@ know-code config --json    # shows active scope
 | **tipHash** | Current `know-code hash` (may differ after commits) |
 | **trailerHash** | Value in `Know-Code-Verified:` on commit messages |
 
-**Tree-stable tip:** after `pass`, the agent may land several commits. With the tree-canonical formula, `tipHash` matches `passHash` while the gated tree is unchanged. The gate stays open via `gatedTreeOid` until you change staged content or the working tree. `commitDrift` is for legacy/mismatched gates — not what CI uses.
+**Tree-stable tip:** after `pass`, the agent may land several commits. With the tree-canonical formula, `tipHash` matches `passHash` while the gated tree is unchanged. The same formula is why CI still matches after you merge or rebase onto an unrelated `main` update. The gate stays open via `gatedTreeOid` until you change staged content or the working tree. `commitDrift` is for legacy/mismatched gates — not what CI uses.
 
 ```mermaid
 flowchart LR

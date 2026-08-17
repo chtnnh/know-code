@@ -13,12 +13,14 @@ const DOCS = "https://kc.chtnnhfoundation.org";
 const ACTION_REF = "chtnnh/know-code/action@v0.3.0";
 
 export function consumerWorkflowYaml(baseBranch: string): string {
-  // PR-only: on a push to the base branch there is no merge-base ahead of
-  // HEAD, so grounded verification has no range to recompute.
+  // PR: checkout the tip (not pull/N/merge). Push: walk github.event.before..HEAD.
   return `name: know-code
 
 on:
   pull_request:
+  push:
+    branches:
+      - ${baseBranch}
 
 jobs:
   verify:
@@ -27,11 +29,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: \${{ github.event.pull_request.head.sha }}
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: ${ACTION_REF}
         with:
           base-branch: ${baseBranch}
+          from: \${{ github.event_name == 'push' && github.event.before || '' }}
 `;
 }
 

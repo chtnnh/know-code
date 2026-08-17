@@ -12,10 +12,35 @@ import { findGitRoot } from "./paths.js";
 import { readRangeSession } from "./range.js";
 import type { Config, DiffContext, QuizContext } from "./types.js";
 
-const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+/** Git's well-known empty-tree OID. */
+export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 export function sha256(input: string): string {
   return createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+function treeOid(repoRoot: string, oid: string): string {
+  if (!oid || oid === EMPTY_TREE) return EMPTY_TREE;
+  return (
+    git(["rev-parse", `${oid}^{tree}`], repoRoot, { allowFail: true }) ||
+    EMPTY_TREE
+  );
+}
+
+/**
+ * Historical tree-pair hash: `sha256("diff:" + git diff FROM_TREE TO_TREE)`.
+ * Uses commit trees (`^{tree}`), never live `write-tree`, so a dirty index
+ * cannot change the result. Push-walk verify hashes each run this way.
+ */
+export function computeTreePairHash(
+  repoRoot: string,
+  fromOid: string,
+  toOid: string,
+): string {
+  const diff = git(["diff", treeOid(repoRoot, fromOid), treeOid(repoRoot, toOid)], repoRoot, {
+    allowFail: true,
+  });
+  return sha256(`diff:${diff}`);
 }
 
 /**
@@ -69,11 +94,7 @@ export function computeRangeDiffContext(
   const headLabel = headRef === EMPTY_TREE ? "HEAD" : headRef;
   const commitCount = revListCount(repoRoot, fromOid, headLabel);
 
-  const fromTree =
-    fromOid === EMPTY_TREE
-      ? EMPTY_TREE
-      : git(["rev-parse", `${fromOid}^{tree}`], repoRoot, { allowFail: true }) ||
-        EMPTY_TREE;
+  const fromTree = treeOid(repoRoot, fromOid);
   const indexTree = indexTreeOid(repoRoot) || EMPTY_TREE;
   const diff = git(["diff", fromTree, indexTree], repoRoot, {
     allowFail: true,

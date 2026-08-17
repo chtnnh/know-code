@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### CI verify on push (stacked-run walker)
+- **`know-code verify --from <oid>`** walks `from..HEAD`, splits by `Know-Code-Verified` hash, and checks each run as a historical tree-pair (parent-of-first tree → last non-merge). Trailerless merges attach to the run but are not the hash tip, so a GitHub merge commit still matches after `main` moved. Linear commits without a trailer fail closed. One-non-merge runs also accept the empty-tree (index) hash of that feature tip.
+- **Workflow + `init --workflow` + composite action** trigger on `push` to the base branch and pass `github.event.before`. PR verify is unchanged (`head.sha`, no `--from`). All-zeros `before` skips the walk.
+- **Docs** describe the push walk and stop claiming verify cannot run after merge.
+
 ## 0.3.0
 
 ### Security — comprehensive exploit hardening (E01–E28)

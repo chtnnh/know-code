@@ -75,6 +75,24 @@ export function mergeBase(repoRoot: string, baseRef: string, headRef: string): s
   return baseRef;
 }
 
+/** True when `ancestor` is an ancestor of `descendant` (equal counts as yes). */
+export function isAncestor(
+  repoRoot: string,
+  ancestor: string,
+  descendant: string,
+): boolean {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
+      cwd: repoRoot,
+      stdio: "ignore",
+      env: knowCodeGitEnv(),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function diffStat(repoRoot: string, from: string, to: string): string {
   return git(["diff", "--stat", `${from}...${to}`], repoRoot, { allowFail: true });
 }

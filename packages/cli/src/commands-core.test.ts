@@ -4,11 +4,13 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { runCheck } from "./commands/check.js";
 import { buildAmendArgs } from "./commands/amend.js";
@@ -250,15 +252,40 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
     }
   });
 
-  it("consumerWorkflowYaml pins action, base branch, and is PR-only", () => {
+  it("consumerWorkflowYaml pins action, base branch, PR tip, and push walk", () => {
     const yml = consumerWorkflowYaml("develop");
     assert.match(yml, /base-branch: develop/);
     assert.match(yml, /chtnnh\/know-code\/action@v0\.3\.0/);
-    // Push-to-base has no merge-base ahead of HEAD — verify must be PR-only.
     assert.match(yml, /pull_request:/);
-    assert.doesNotMatch(yml, /push:/);
-    // Default PR checkout is a merge commit without trailers — pin the tip.
-    assert.match(yml, /github\.event\.pull_request\.head\.sha/);
+    assert.match(yml, /push:/);
+    assert.match(yml, /branches:\n {6}- develop/);
+    assert.match(yml, /github\.event\.pull_request\.head\.sha \|\| github\.sha/);
+    assert.match(yml, /github\.event\.before/);
+  });
+
+  it("monorepo workflow and composite action wire push --from", () => {
+    const repoRoot = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "..",
+      "..",
+    );
+    const workflow = readFileSync(
+      join(repoRoot, ".github", "workflows", "know-code.yml"),
+      "utf8",
+    );
+    assert.match(workflow, /push:/);
+    assert.match(workflow, /branches: \[main\]/);
+    assert.match(workflow, /verify --from/);
+    assert.match(workflow, /github\.event\.before/);
+    assert.match(workflow, /github\.event\.pull_request\.head\.sha \|\| github\.sha/);
+    assert.match(workflow, /new branch push/);
+    assert.match(workflow, /else\n            know-code verify\n/);
+
+    const action = readFileSync(join(repoRoot, "action", "action.yml"), "utf8");
+    assert.match(action, /^ {2}from:/m);
+    assert.match(action, /zero before SHA/);
+    assert.match(action, /--from \$FROM/);
   });
 
   it("validateQuiz happy and sad", () => {

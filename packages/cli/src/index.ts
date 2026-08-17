@@ -71,7 +71,7 @@ Usage:
   know-code override
   know-code status [--json] [--next]
   know-code hash [--explain] [--json]
-  know-code verify [--require-all] [--require-range-trailers] [--range-seal]
+  know-code verify [--from <oid>] [--require-all] [--require-range-trailers] [--range-seal]
   know-code hooks install
   know-code hooks uninstall [--agents claude,cursor,codex]
   know-code skills [--global] [--agents …] [-y]
@@ -338,10 +338,17 @@ function main(): void {
         });
         break;
       case "verify":
+        if (flags.from === true) {
+          console.error(
+            "know-code: --from requires a commit SHA (github.event.before)",
+          );
+          process.exit(1);
+        }
         cmdVerify({
           requireAll: flags["require-all"] === true,
           requireRangeTrailers: flags["require-range-trailers"] === true,
           rangeSeal: flags["range-seal"] === true,
+          from: typeof flags.from === "string" ? flags.from : undefined,
         });
         break;
       case "ask":
