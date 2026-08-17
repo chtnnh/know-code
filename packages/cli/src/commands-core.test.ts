@@ -256,6 +256,7 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
     const yml = consumerWorkflowYaml("develop");
     assert.match(yml, /base-branch: develop/);
     assert.match(yml, /chtnnh\/know-code\/action@v0\.3\.0/);
+    assert.match(yml, /actions\/checkout@v5/);
     assert.match(yml, /pull_request:/);
     assert.match(yml, /push:/);
     assert.match(yml, /branches:\n {6}- develop/);
@@ -274,6 +275,8 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
       join(repoRoot, ".github", "workflows", "know-code.yml"),
       "utf8",
     );
+    assert.match(workflow, /actions\/checkout@v5/);
+    assert.match(workflow, /actions\/setup-node@v5/);
     assert.match(workflow, /push:/);
     assert.match(workflow, /branches: \[main\]/);
     assert.match(workflow, /verify --from/);
@@ -283,6 +286,7 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
     assert.match(workflow, /else\n            know-code verify\n/);
 
     const action = readFileSync(join(repoRoot, "action", "action.yml"), "utf8");
+    assert.match(action, /actions\/setup-node@v5/);
     assert.match(action, /^ {2}from:/m);
     assert.match(action, /zero before SHA/);
     assert.match(action, /--from \$FROM/);
