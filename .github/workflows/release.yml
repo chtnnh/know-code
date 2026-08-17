@@ -20,12 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Node 24 → npm ≥ 11.5.1 (required for trusted publishing).
       # Do NOT set registry-url: setup-node would inject a dummy NODE_AUTH_TOKEN
       # that prevents the OIDC exchange (ENEEDAUTH).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           package-manager-cache: false
