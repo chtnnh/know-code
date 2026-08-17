@@ -1,9 +1,10 @@
 name: know-code verify
 description: >-
-  Verify Know-Code-Verified commit trailers against grounded tree hashes
-  (index and merge-base→write-tree). Callers must checkout the PR tip
-  (ref: github.event.pull_request.head.sha) with fetch-depth: 0 — the
-  default merge commit has no trailers. Use on pull_request only.
+  Verify Know-Code-Verified commit trailers against grounded tree hashes.
+  On pull_request, checkout the PR tip (ref: github.event.pull_request.head.sha)
+  with fetch-depth: 0 — the default merge commit has no trailers. On push to
+  the base branch, pass from: github.event.before so verify walks each landed
+  run instead of treating HEAD as the merge-base.
 author: chtnnh
 branding:
   icon: shield
@@ -22,6 +23,12 @@ inputs:
     description: If true, verify every commit in the range has Know-Code-Verified trailers
     required: false
     default: "false"
+  from:
+    description: >-
+      Previous tip SHA for push jobs (github.event.before). Empty on
+      pull_request. All-zeros skips the walk (new branch).
+    required: false
+    default: ""
   version:
     description: npm version range for know-code when not building from this repo
     required: false
@@ -63,7 +70,15 @@ runs:
     - name: Verify Know-Code-Verified trailer
       shell: bash
       run: |
+        FROM="${{ inputs.from }}"
+        if [[ "$FROM" =~ ^0+$ ]]; then
+          echo "know-code: new branch push (zero before SHA) — skip walk"
+          exit 0
+        fi
         ARGS=""
+        if [[ -n "$FROM" ]]; then
+          ARGS="$ARGS --from $FROM"
+        fi
         if [[ "${{ inputs.require-all }}" == "true" ]]; then
           ARGS="$ARGS --require-all"
         fi

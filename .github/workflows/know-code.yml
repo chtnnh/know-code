@@ -1,11 +1,13 @@
 name: know-code
 
-# PR-only: grounded verification needs a merge-base ahead of HEAD. On a push
-# to main, HEAD *is* origin/main (zero commits ahead), so there is no range to
-# recompute and verify can never match a grounded hash.
+# PR: checkout the tip (not pull/N/merge) and run default verify.
+# Push: walk github.event.before..HEAD so landings on main still match
+# per-run trailers (origin/main == HEAD has no merge-base range).
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
 
 jobs:
   verify:
@@ -16,7 +18,8 @@ jobs:
           fetch-depth: 0
           # Default pull_request checkout is a merge commit (no trailers).
           # Verify must run on the PR tip that carries Know-Code-Verified.
-          ref: ${{ github.event.pull_request.head.sha }}
+          # On push, head.sha is empty so this is github.sha (the new tip).
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -35,4 +38,14 @@ jobs:
           printf '{\n  "level": "standard",\n  "baseBranch": "main",\n  "requireTrailer": true\n}\n' > .know-code/config.json
 
       - name: Verify Know-Code-Verified trailer
-        run: know-code verify
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            if [[ "$BEFORE" =~ ^0+$ ]]; then
+              echo "know-code: new branch push — skip walk"
+              exit 0
+            fi
+            know-code verify --from "$BEFORE"
+          else
+            know-code verify
+          fi

@@ -14,6 +14,14 @@ import {
   primaryVerifyCandidate,
   type VerifyHashCandidate,
 } from "../verify-helpers.js";
+import {
+  assertFromAncestorOfHead,
+  groundedHashesForSegment,
+  isZeroOid,
+  partitionPushWalk,
+  resolveFromCommit,
+  segmentTrailerMatches,
+} from "../verify-walk.js";
 import type { QuizContext } from "../types.js";
 
 function trailersInRange(repoRoot: string, from: string, to: string): string[] {
@@ -39,6 +47,7 @@ export interface VerifyResult {
   exitCode: number;
   messages: string[];
   errors: string[];
+  warnings?: string[];
   primary?: VerifyHashCandidate;
   matched?: VerifyHashCandidate | { label: string };
   ctx?: QuizContext;
@@ -50,6 +59,7 @@ export function runVerify(
     requireAll?: boolean;
     requireRangeTrailers?: boolean;
     rangeSeal?: boolean;
+    from?: string;
   } = {},
 ): VerifyResult {
   const config = readConfig(repoRoot);
@@ -58,6 +68,10 @@ export function runVerify(
   const primary = primaryVerifyCandidate(candidates);
   const messages: string[] = [];
   const errors: string[] = [];
+
+  if (opts.from !== undefined) {
+    return runVerifyWalk(repoRoot, opts.from, { messages, errors, primary, ctx });
+  }
 
   if (opts.rangeSeal) {
     const seal = readRangeSeal(repoRoot);
@@ -196,14 +210,107 @@ export function runVerify(
   return { ok: false, exitCode: 1, messages, errors, primary, ctx };
 }
 
+function runVerifyWalk(
+  repoRoot: string,
+  fromArg: string,
+  parts: {
+    messages: string[];
+    errors: string[];
+    primary: VerifyHashCandidate;
+    ctx: QuizContext;
+  },
+): VerifyResult {
+  const { messages, errors, primary, ctx } = parts;
+  messages.push(`know-code verify --from ${fromArg.slice(0, 12)}`);
+
+  const resolved = resolveFromCommit(repoRoot, fromArg);
+  if (!resolved.ok) {
+    errors.push(resolved.error);
+    return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+  }
+
+  if (isZeroOid(resolved.oid)) {
+    messages.push(
+      "know-code: --from is the zero SHA (new branch); nothing to walk",
+    );
+    return { ok: true, exitCode: 0, messages, errors, primary, ctx };
+  }
+
+  const anc = assertFromAncestorOfHead(repoRoot, resolved.oid);
+  if (!anc.ok) {
+    errors.push(anc.error);
+    return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+  }
+
+  if (resolved.oid === anc.head) {
+    const warnings = [
+      "know-code: warning — --from is HEAD; nothing to walk",
+    ];
+    return { ok: true, exitCode: 0, messages, errors, warnings, primary, ctx };
+  }
+
+  const part = partitionPushWalk(repoRoot, resolved.oid, anc.head);
+  if (!part.ok) {
+    errors.push(part.error);
+    return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+  }
+
+  if (part.segments.length === 0) {
+    errors.push(
+      `know-code: no commits in ${resolved.oid.slice(0, 12)}..HEAD`,
+    );
+    return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+  }
+
+  messages.push(
+    `  walking ${resolved.oid.slice(0, 12)}..HEAD (${part.segments.length} run${part.segments.length === 1 ? "" : "s"})`,
+  );
+
+  for (const [i, seg] of part.segments.entries()) {
+    if (!segmentTrailerMatches(repoRoot, seg)) {
+      const { rangeHash, indexHash } = groundedHashesForSegment(repoRoot, seg);
+      errors.push(
+        `know-code: run ${i + 1} ${seg.fromOid.slice(0, 12)}..${seg.toOid.slice(0, 12)} trailer ${seg.trailerHash.slice(0, 12)}… does not match tree pair ${rangeHash.slice(0, 12)}…` +
+          (indexHash ? ` (or index ${indexHash.slice(0, 12)}…)` : ""),
+      );
+      return { ok: false, exitCode: 1, messages, errors, primary, ctx };
+    }
+    const hashes = groundedHashesForSegment(repoRoot, seg);
+    const kind =
+      hashes.indexHash &&
+      seg.trailerHash === hashes.indexHash &&
+      seg.trailerHash !== hashes.rangeHash
+        ? "index"
+        : "tree-pair";
+    messages.push(
+      `know-code: run ${i + 1} verified (${kind}, ${seg.oids.length} commit${seg.oids.length === 1 ? "" : "s"})`,
+    );
+  }
+
+  messages.push(
+    `know-code: push walk verified (${part.segments.length} run${part.segments.length === 1 ? "" : "s"})`,
+  );
+  return {
+    ok: true,
+    exitCode: 0,
+    messages,
+    errors,
+    primary,
+    matched: { label: "push-walk" },
+    ctx,
+  };
+}
+
 export function cmdVerify(opts: {
   requireAll?: boolean;
   requireRangeTrailers?: boolean;
   rangeSeal?: boolean;
+  from?: string;
 }): void {
   const repoRoot = findGitRoot();
   const result = runVerify(repoRoot, opts);
   for (const m of result.messages) console.log(m);
+  for (const w of result.warnings ?? []) console.error(w);
   for (const e of result.errors) console.error(e);
   process.exit(result.exitCode);
 }

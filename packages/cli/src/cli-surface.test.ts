@@ -217,4 +217,19 @@ describe("cli surface (spawned)", () => {
       cleanup();
     }
   });
+
+  it("verify --from requires a SHA; help lists the flag", () => {
+    const { root, cleanup } = withTempRepo("kc-cli-from-");
+    try {
+      setupRepo(root);
+      const missing = kc(root, ["verify", "--from"]);
+      assert.equal(missing.status, 1);
+      assert.match(missing.stderr, /requires a commit SHA/);
+      const help = kc(root, ["help"]);
+      assert.equal(help.status, 0);
+      assert.match(help.stdout, /verify \[--from <oid>\]/);
+    } finally {
+      cleanup();
+    }
+  });
 });

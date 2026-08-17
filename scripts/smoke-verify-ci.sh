@@ -98,6 +98,15 @@ echo "$OUT"
 test "$code" -eq 0
 echo "$OUT" | grep -q "HEAD trailer verified"
 
+BEFORE="$(git rev-parse HEAD^)"
+set +e
+WALK="$(node "$KC" verify --from "$BEFORE" 2>&1)"
+walk=$?
+set -e
+echo "$WALK"
+test "$walk" -eq 0
+echo "$WALK" | grep -q "push walk verified"
+
 # Negative: fake trailer must fail.
 git -c commit.gpgsign=false commit --amend --no-verify -m "$(cat <<EOF
 feat: smoke verify feature

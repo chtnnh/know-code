@@ -87,7 +87,7 @@ Hooks gate `gh pr create` and `glab mr create`. Complete the quiz pipeline **bef
 | **receipt** | Trailer on the **tip** is enough for CI | Writes signed `range-seal.json` (local only; CI ignores it) |
 | **rewrite** | Every commit in the range must share the same trailer | `range seal --rewrite` rewrites messages + `git push --force-with-lease` |
 
-This repo’s `know-code.yml` is **receipt**: `know-code verify` on the PR tip. Opt into `--require-range-trailers` only when you also rewrite.
+This repo’s `know-code.yml` is **receipt** on the PR (tip trailer is enough) plus a **push walk** on `main` (`verify --from` previous tip). Opt into `--require-range-trailers` on the PR job only when you also rewrite. The push walker requires a trailer on every non-merge in `before..HEAD` — squash landings and rewrite ranges pass; a merge-commit of a tip-only receipt PR does not.
 
 ## When to `range abort`
 
