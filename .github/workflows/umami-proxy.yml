@@ -8,29 +8,61 @@ on:
     paths:
       - "infra/umami-proxy/**"
       - ".github/workflows/umami-proxy.yml"
+  pull_request:
+    paths:
+      - "infra/umami-proxy/**"
+      - ".github/workflows/umami-proxy.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: umami-proxy
+  group: umami-proxy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: infra/umami-proxy/package-lock.json
+      - name: Install Worker deps
+        working-directory: infra/umami-proxy
+        run: npm ci
+      - name: Test
+        working-directory: infra/umami-proxy
+        run: npm test
+      - name: Bundle (dry-run)
+        working-directory: infra/umami-proxy
+        run: npx wrangler deploy --dry-run
 
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Require UMAMI_ORIGIN
+        env:
+          UMAMI_ORIGIN: ${{ secrets.UMAMI_ORIGIN }}
+        run: test -n "$UMAMI_ORIGIN"
+      # wrangler-action's `secrets:` input runs secret bulk BEFORE deploy, which
+      # fails when the Worker does not exist yet — the route stays in git and
+      # nothing is provisioned. Deploy the script first, then bind the origin.
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: infra/umami-proxy
-          secrets: |
-            UMAMI_ORIGIN
+          command: deploy
+          postCommands: printf '%s' "$UMAMI_ORIGIN" | npx wrangler secret put UMAMI_ORIGIN
         env:
           UMAMI_ORIGIN: ${{ secrets.UMAMI_ORIGIN }}

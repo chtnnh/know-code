@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Umami proxy provision
+- **Deploy the Worker before binding `UMAMI_ORIGIN`.** wrangler-action’s `secrets:` input ran `secret bulk` first, which fails when the Worker does not exist yet — `wrangler.jsonc` still listed the `/s/*` route, so git looked provisioned while nothing was uploaded. CI now deploys, then `secret put`.
+- PRs that touch the proxy run unit tests + `wrangler deploy --dry-run`; only `main` / `workflow_dispatch` deploy.
+
 ### CI verify on push (stacked-run walker)
 - **`know-code verify --from <oid>`** walks `from..HEAD`, splits by `Know-Code-Verified` hash, and checks each run as a historical tree-pair (parent-of-first tree → last non-merge). Trailerless merges attach to the run but are not the hash tip, so a GitHub merge commit still matches after `main` moved. Linear commits without a trailer fail closed. One-non-merge runs also accept the empty-tree (index) hash of that feature tip.
 - **Workflow + `init --workflow` + composite action** trigger on `push` to the base branch and pass `github.event.before`. PR verify is unchanged (`head.sha`, no `--from`). All-zeros `before` skips the walk.

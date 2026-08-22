@@ -12,6 +12,11 @@ so the browser never talks to a third-party analytics host (ad-blocker bypass).
 Neutral path names (`/s/x.js`, `/s/e`) avoid EasyPrivacy hits on `umami`,
 `analytics`, `script.js`, and `/api/send`. The dashboard is **not** proxied.
 
+`workers_dev` stays off so Cloudflare does not publish
+`kc-umami-proxy.<account>.workers.dev` (the hostname would contain `umami`).
+Do not attach this Worker as a custom domain on `kc.chtnnhfoundation.org` —
+that would steal the host from GitHub Pages. The zone route `/s/*` is enough.
+
 ## One-time setup
 
 1. **DNS.** `kc.chtnnhfoundation.org` must be orange-clouded on Cloudflare
@@ -25,20 +30,21 @@ Neutral path names (`/s/x.js`, `/s/e`) avoid EasyPrivacy hits on `umami`,
 
    | Secret | Value |
    |--------|--------|
-   | `CLOUDFLARE_API_TOKEN` | Token with Workers Scripts Edit + Workers Routes Edit on this account |
+   | `CLOUDFLARE_API_TOKEN` | Account-scoped token with **Workers Scripts Edit** (uploads the Worker) and **Workers Routes Edit** (attaches `/s/*`). Routes Edit alone leaves the route defined and the script missing. |
    | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
    | `UMAMI_ORIGIN` | `https://<your-umami-host>` (no trailing slash) |
 
    First deploy: **Actions → umami-proxy → Run workflow**. Later pushes to
    `infra/umami-proxy/**` on `main` deploy automatically
-   (`.github/workflows/umami-proxy.yml`). The action syncs `UMAMI_ORIGIN` as a
-   Worker secret on each run.
+   (`.github/workflows/umami-proxy.yml`). The workflow **deploys the Worker,
+   then** binds `UMAMI_ORIGIN`. Putting the secret first fails when the Worker
+   does not exist yet.
 
-   Manual fallback:
+   Manual fallback (same order):
 
    ```bash
-   npx wrangler secret put UMAMI_ORIGIN
    npx wrangler deploy
+   npx wrangler secret put UMAMI_ORIGIN
    ```
 
 5. **Docs build.** Repo variable `UMAMI_WEBSITE_ID` (Settings → Secrets and
@@ -50,7 +56,14 @@ Neutral path names (`/s/x.js`, `/s/e`) avoid EasyPrivacy hits on `umami`,
    JavaScript containing `/s/e`, not `/api/send`. Load a docs page with
    ad-blocker on; Umami realtime should show a view.
 
-## Local docs
+## Local
+
+```bash
+cd infra/umami-proxy
+npm install
+npm test
+npx wrangler deploy --dry-run
+```
 
 `docusaurus start` does not inject the script (`data-domains` would also
 exclude `localhost`). No events leak from local preview.

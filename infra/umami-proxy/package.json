@@ -1,0 +1,13 @@
+{
+  "name": "kc-umami-proxy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/paths.test.ts",
+    "deploy": "wrangler deploy",
+    "dry-run": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

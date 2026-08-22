@@ -2,8 +2,14 @@
   "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
   "name": "kc-umami-proxy",
   "main": "src/index.ts",
-  "compatibility_date": "2026-08-11",
+  "compatibility_date": "2026-08-18",
+  // Path route on the existing Pages hostname. Do not set workers_dev (the
+  // *.workers.dev name would contain "umami") or custom_domain (that would
+  // steal kc.chtnnhfoundation.org from GitHub Pages).
   "workers_dev": false,
+  "observability": {
+    "enabled": true
+  },
   "routes": [
     {
       "pattern": "kc.chtnnhfoundation.org/s/*",
