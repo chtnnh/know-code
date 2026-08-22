@@ -17,6 +17,9 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm test
+      - name: Umami proxy tests
+        working-directory: infra/umami-proxy
+        run: npm ci && npm test
       - run: npm run build:docs
       - name: CLI smoke (enforcement)
         run: npm run smoke

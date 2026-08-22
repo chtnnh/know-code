@@ -5,29 +5,33 @@
  *   GET  /s/x.js  →  {UMAMI_ORIGIN}/script.js   (rewrites /api/send → /s/e)
  *   POST /s/e     →  {UMAMI_ORIGIN}/api/send
  *
- * Dashboard and other Umami routes are not exposed. Set UMAMI_ORIGIN with
- * `wrangler secret put UMAMI_ORIGIN` (e.g. https://umami.example.com).
+ * Dashboard and other Umami routes are not exposed. Deploy the Worker first,
+ * then `wrangler secret put UMAMI_ORIGIN` (e.g. https://umami.example.com).
  */
 
-const SCRIPT_PATH = "/s/x.js";
-const COLLECT_PATH = "/s/e";
-const ORIGIN_SCRIPT = "/script.js";
-const ORIGIN_COLLECT = "/api/send";
+import {
+  COLLECT_PATH,
+  ORIGIN_COLLECT,
+  ORIGIN_SCRIPT,
+  matchProxyPath,
+  originBase,
+  rewriteTrackerScript,
+} from "./paths.ts";
 
 export interface Env {
   UMAMI_ORIGIN: string;
-}
-
-function originBase(env: Env): string {
-  return env.UMAMI_ORIGIN.replace(/\/$/, "");
 }
 
 function visitorIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") || "";
 }
 
-async function proxyScript(request: Request, env: Env): Promise<Response> {
-  const url = `${originBase(env)}${ORIGIN_SCRIPT}`;
+async function proxyScript(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  const url = `${originBase(env.UMAMI_ORIGIN)}${ORIGIN_SCRIPT}`;
   const cache = caches.default;
   const cacheKey = new Request(url, { method: "GET" });
   const cached = await cache.match(cacheKey);
@@ -40,9 +44,7 @@ async function proxyScript(request: Request, env: Env): Promise<Response> {
     return new Response("tracker unavailable", { status: 502 });
   }
 
-  let body = await upstream.text();
-  body = body.replaceAll(ORIGIN_COLLECT, COLLECT_PATH);
-
+  const body = rewriteTrackerScript(await upstream.text());
   const response = new Response(body, {
     status: 200,
     headers: {
@@ -51,11 +53,7 @@ async function proxyScript(request: Request, env: Env): Promise<Response> {
       "X-Content-Type-Options": "nosniff",
     },
   });
-  try {
-    await cache.put(cacheKey, response.clone());
-  } catch {
-    // Cache put is best-effort (quota / disallowed methods).
-  }
+  ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => undefined));
   return response;
 }
 
@@ -76,7 +74,7 @@ async function proxyCollect(request: Request, env: Env): Promise<Response> {
     headers.set("X-Real-IP", ip);
   }
 
-  const upstream = await fetch(`${originBase(env)}${ORIGIN_COLLECT}`, {
+  const upstream = await fetch(`${originBase(env.UMAMI_ORIGIN)}${ORIGIN_COLLECT}`, {
     method: "POST",
     headers,
     body: request.body,
@@ -91,13 +89,13 @@ async function proxyCollect(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (!env.UMAMI_ORIGIN) {
       return new Response("UMAMI_ORIGIN not configured", { status: 500 });
     }
-    const path = new URL(request.url).pathname;
-    if (path === SCRIPT_PATH) return proxyScript(request, env);
-    if (path === COLLECT_PATH) return proxyCollect(request, env);
+    const route = matchProxyPath(new URL(request.url).pathname);
+    if (route === "script") return proxyScript(request, env, ctx);
+    if (route === "collect") return proxyCollect(request, env);
     return new Response("not found", { status: 404 });
   },
 };
