@@ -22,6 +22,7 @@ import { applyTrailerToRange } from "../trailers.js";
 import type { RangeSealReceipt, RangeSealMode } from "../types.js";
 
 export function cmdRangeBegin(opts: { from?: string }): void {
+  const repoRoot = findGitRoot();
   try {
     const session = beginRangeSession(repoRoot, opts.from);
     console.log(`know-code: range began at ${session.fromOid.slice(0, 12)}…`);
@@ -34,6 +35,7 @@ export function cmdRangeBegin(opts: { from?: string }): void {
 }
 
 export function cmdRangeStatus(json = false): void {
+  const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const session = readRangeSession(repoRoot);
   const state = resolveEffectiveQuizState(repoRoot, config);

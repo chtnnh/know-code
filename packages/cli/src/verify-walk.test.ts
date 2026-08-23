@@ -107,7 +107,7 @@ describe("partitionPushWalk", () => {
   it("splits stacked trailer hashes into independent runs", () => {
     const repo = initLab("kc-part-stack-");
     try {
-      commitFile(repo, "a.txt", "0\n", "base");
+      const base = commitFile(repo, "a.txt", "0\n", "base");
       commitFile(repo, "a.txt", "1\n", "one");
       const s1 = stampTrailer(repo, "a".repeat(64), "one");
       commitFile(repo, "a.txt", "2\n", "two");
