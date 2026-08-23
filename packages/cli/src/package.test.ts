@@ -23,6 +23,7 @@ describe("published package contents", () => {
     assert.ok(paths.includes("bin/know-code.js"));
     assert.ok(paths.includes("hooks/check-shell.sh"));
     assert.ok(paths.every((path) => !/\.test\./.test(path)));
+    assert.ok(paths.every((path) => !path.endsWith(".map")));
     assert.ok(paths.every((path) => !path.startsWith("website/")));
     assert.ok(paths.every((path) => !path.includes("test-helpers")));
   });

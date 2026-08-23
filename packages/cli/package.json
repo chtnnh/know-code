@@ -13,6 +13,7 @@
     "dist",
     "!dist/**/*.test.*",
     "!dist/test-helpers.*",
+    "!dist/**/*.map",
     "hooks",
     "README.md",
     "LICENSE"
