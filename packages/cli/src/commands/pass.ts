@@ -56,8 +56,8 @@ export async function cmdPass(opts: {
     process.exit(1);
   }
 
-  let answers;
-  let grade;
+  let answers: ReturnType<typeof assertAnswersForHash>;
+  let grade: ReturnType<typeof assertGradeForHash>;
   try {
     assertTaughtForHash(repoRoot, ctx.diffHash);
     answers = assertAnswersForHash(repoRoot, ctx.diffHash);

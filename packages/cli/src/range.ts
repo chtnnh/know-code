@@ -119,7 +119,7 @@ export function clearRangeSeal(repoRoot: string): void {
 /** After range seal --rewrite, tip hash / trailers match seal even if gate was passHash. */
 export function isSealedRewriteRangeOpen(repoRoot: string): boolean {
   const seal = readRangeSeal(repoRoot);
-  if (!seal || seal.sealMode !== "rewrite" || !seal.rangeFromOid) {
+  if (seal?.sealMode !== "rewrite" || !seal.rangeFromOid) {
     return false;
   }
   // New commits after seal move HEAD — rewrite-open only at the sealed tip.

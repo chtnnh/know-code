@@ -128,7 +128,8 @@ export function cmdCheck(opts: RunCheckOptions = {}): never {
         "know-code: KNOW_CODE_OVERRIDE=1 — check passed via human override (logged).",
       );
     } else if (isSealedRewriteRangeOpen(repoRoot)) {
-      const seal = readRangeSeal(repoRoot)!;
+      const seal = readRangeSeal(repoRoot);
+      if (!seal) throw new Error("sealed rewrite range missing seal");
       console.error(
         `know-code: gate open (sealed rewrite range) for ${seal.diffHash.slice(0, 12)}…`,
       );
@@ -136,11 +137,11 @@ export function cmdCheck(opts: RunCheckOptions = {}): never {
       const receipt = readGateSafe(repoRoot);
       if (commitDrift) {
         console.error(
-          `know-code: gate open (${receipt!.level}, ${ctx.scope}) — tree unchanged since pass (${effectiveHash.slice(0, 12)}…)`,
+          `know-code: gate open (${receipt?.level}, ${ctx.scope}) — tree unchanged since pass (${effectiveHash.slice(0, 12)}…)`,
         );
       } else {
         console.error(
-          `know-code: gate open (${receipt!.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
+          `know-code: gate open (${receipt?.level}, ${ctx.scope}) for ${ctx.diffHash.slice(0, 12)}…`,
         );
       }
     }

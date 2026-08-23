@@ -132,9 +132,7 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     gradeDetail: gradeStaleDetail,
     gradeProposal: proposalR.corrupt
       ? "corrupt"
-      : proposal?.diffHash === effectiveHash
-        ? true
-        : false,
+      : proposal?.diffHash === effectiveHash,
     gradeProposalDetail: proposalStaleDetail,
     overrideEnv: process.env.KNOW_CODE_OVERRIDE === "1",
     overrideAllow: hasValidOverrideAllow(repoRoot),

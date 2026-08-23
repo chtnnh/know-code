@@ -54,7 +54,9 @@ describe("attest seals (Ed25519)", () => {
     };
     const { keyId, sig } = signPayload(repoRoot, passphrase, payload);
     const sealed = { ...payload, keyId, sig };
-    const pub = readAttestMeta(repoRoot)!.pubKey;
+    const attestMeta = readAttestMeta(repoRoot);
+    assert.ok(attestMeta);
+    const pub = attestMeta.pubKey;
     assert.equal(verifyPayload(pub, sealed), true);
   });
 
@@ -66,7 +68,9 @@ describe("attest seals (Ed25519)", () => {
       skipped: false,
     };
     const { keyId, sig } = signPayload(repoRoot, passphrase, payload);
-    const pub = readAttestMeta(repoRoot)!.pubKey;
+    const attestMeta = readAttestMeta(repoRoot);
+    assert.ok(attestMeta);
+    const pub = attestMeta.pubKey;
     assert.equal(
       verifyPayload(pub, { ...payload, skipped: true, keyId, sig }),
       false,
@@ -104,7 +108,9 @@ describe("attest seals (Ed25519)", () => {
   });
 
   it("forged sig without private key fails verify", () => {
-    const pub = readAttestMeta(repoRoot)!.pubKey;
+    const attestMeta = readAttestMeta(repoRoot);
+    assert.ok(attestMeta);
+    const pub = attestMeta.pubKey;
     assert.equal(
       verifyPayload(pub, {
         version: 1,

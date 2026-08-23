@@ -21,7 +21,7 @@ export function buildAmendArgs(
 ): string[] {
   const noTrailer = rawArgs.includes("--no-trailer");
   const gitArgs = rawArgs.filter((a) => a !== "--no-trailer");
-  let finalArgs = ["--amend", ...gitArgs];
+  const finalArgs = ["--amend", ...gitArgs];
 
   if (noTrailer) return finalArgs;
 

@@ -283,7 +283,7 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
     assert.match(workflow, /github\.event\.before/);
     assert.match(workflow, /github\.event\.pull_request\.head\.sha \|\| github\.sha/);
     assert.match(workflow, /new branch push/);
-    assert.match(workflow, /else\n            know-code verify\n/);
+    assert.match(workflow, /else\n {12}know-code verify\n/);
 
     const action = readFileSync(join(repoRoot, "action", "action.yml"), "utf8");
     assert.match(action, /actions\/setup-node@v5/);
@@ -333,10 +333,12 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
       const checks = await runDoctor(root);
       const hooks = checks.find((c) => c.name === "git-hooks");
       assert.ok(hooks);
-      assert.equal(hooks!.ok, false);
+      assert.equal(hooks.ok, false);
       installGitHooks(root);
       const after = await runDoctor(root);
-      assert.equal(after.find((c) => c.name === "git-hooks")!.ok, true);
+      const hooksAfterInstall = after.find((c) => c.name === "git-hooks");
+      assert.ok(hooksAfterInstall);
+      assert.equal(hooksAfterInstall.ok, true);
     } finally {
       cleanup();
     }

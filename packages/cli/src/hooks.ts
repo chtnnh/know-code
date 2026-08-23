@@ -116,7 +116,7 @@ export function gitGateHookIsCurrent(content: string): boolean {
     content.includes("unset KNOW_CODE_COMMIT") &&
     content.includes("--push") &&
     // 0.3.0: empty CHECK_ARGS under bash 3.2 + set -u
-    content.includes("${#CHECK_ARGS[@]}")
+    content.includes("$" + "{#CHECK_ARGS[@]}")
   );
 }
 

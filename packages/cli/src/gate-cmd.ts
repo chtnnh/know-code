@@ -70,7 +70,7 @@ function scanGitPushInvocation(cmd: string): string {
  * parsed command field is passed (never the raw hook stdin blob).
  */
 export function shouldGate(cmd: string): boolean {
-  if (!cmd || !cmd.trim()) return false;
+  if (!cmd.trim()) return false;
   return (
     GIT_COMMIT_CMD.test(cmd) ||
     GIT_PUSH_CMD.test(cmd) ||

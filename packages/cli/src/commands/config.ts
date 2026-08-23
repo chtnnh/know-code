@@ -1,4 +1,4 @@
-import { readConfig, setConfigValue, writeConfig } from "../config.js";
+import { readConfig, setConfigValue } from "../config.js";
 import { resolveQuizContext } from "../hash.js";
 import {
   findGitRoot,

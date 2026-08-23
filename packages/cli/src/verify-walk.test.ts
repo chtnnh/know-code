@@ -167,7 +167,7 @@ describe("partitionPushWalk", () => {
   it("fails when a merge has no current run to attach to", () => {
     const repo = initLab("kc-part-orphan-merge-");
     try {
-      const base = commitFile(repo, "a.txt", "0\n", "base");
+      commitFile(repo, "a.txt", "0\n", "base");
       git(repo, ["checkout", "-b", "feat"]);
       commitFile(repo, "feat.txt", "f\n", "feat");
       const tip = stampTrailer(repo, "c".repeat(64), "feat");

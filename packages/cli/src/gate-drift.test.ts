@@ -174,7 +174,9 @@ describe("gate survives commit when tree unchanged (range drift)", () => {
     const after = resolveEffectiveQuizState(repoRoot);
     assert.equal(after.commitDrift, false);
     assert.equal(after.effectiveHash, hash);
-    assert.equal(readGate(repoRoot)!.gatedTreeOid, gatedTreeOid);
+    const gate = readGate(repoRoot);
+    assert.ok(gate);
+    assert.equal(gate.gatedTreeOid, gatedTreeOid);
     assert.equal(runCheck(repoRoot).allowed, true);
 
     assert.equal(
