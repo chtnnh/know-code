@@ -15,6 +15,7 @@ import {
   matchProxyPath,
   originBase,
   rewriteTrackerScript,
+  trackerCacheKeyUrl,
 } from "./paths.ts";
 
 export interface Env {
@@ -30,13 +31,13 @@ async function proxyScript(
   env: Env,
   ctx: ExecutionContext,
 ): Promise<Response> {
-  const url = `${originBase(env.UMAMI_ORIGIN)}${ORIGIN_SCRIPT}`;
+  const upstreamUrl = `${originBase(env.UMAMI_ORIGIN)}${ORIGIN_SCRIPT}`;
   const cache = caches.default;
-  const cacheKey = new Request(url, { method: "GET" });
+  const cacheKey = new Request(trackerCacheKeyUrl(upstreamUrl), { method: "GET" });
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  const upstream = await fetch(url, {
+  const upstream = await fetch(upstreamUrl, {
     headers: { "User-Agent": request.headers.get("User-Agent") || "kc-umami-proxy" },
   });
   if (!upstream.ok) {

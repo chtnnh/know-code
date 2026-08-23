@@ -6,6 +6,8 @@ import {
   matchProxyPath,
   originBase,
   rewriteTrackerScript,
+  TRACKER_CACHE_VERSION,
+  trackerCacheKeyUrl,
 } from "./paths.ts";
 
 describe("originBase", () => {
@@ -32,6 +34,24 @@ describe("rewriteTrackerScript", () => {
   it("does not rewrite other Umami routes", () => {
     const src = 'fetch("/api/websites")';
     assert.equal(rewriteTrackerScript(src), src);
+  });
+});
+
+describe("trackerCacheKeyUrl", () => {
+  it("versions transformed responses without changing the upstream fetch URL", () => {
+    const upstreamUrl = "https://umami.example.com/script.js";
+    assert.equal(
+      trackerCacheKeyUrl(upstreamUrl),
+      `https://umami.example.com/script.js?__kc_proxy_transform=${TRACKER_CACHE_VERSION}`,
+    );
+    assert.equal(upstreamUrl, "https://umami.example.com/script.js");
+  });
+
+  it("preserves upstream query parameters", () => {
+    assert.equal(
+      trackerCacheKeyUrl("https://umami.example.com/script.js?locale=en"),
+      `https://umami.example.com/script.js?locale=en&__kc_proxy_transform=${TRACKER_CACHE_VERSION}`,
+    );
   });
 });
 

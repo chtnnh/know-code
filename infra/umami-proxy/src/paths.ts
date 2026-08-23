@@ -5,6 +5,11 @@ export const COLLECT_PATH = "/s/e";
 export const ORIGIN_SCRIPT = "/script.js";
 export const ORIGIN_COLLECT = "/api/send";
 
+// Bump this whenever the Worker changes the transformed tracker response.
+// Cache API entries outlive Worker deployments, so this avoids serving a
+// response produced by an older transform.
+export const TRACKER_CACHE_VERSION = "v1";
+
 export type ProxyRoute = "script" | "collect";
 
 export function originBase(origin: string): string {
@@ -13,6 +18,13 @@ export function originBase(origin: string): string {
 
 export function rewriteTrackerScript(body: string): string {
   return body.replaceAll(ORIGIN_COLLECT, COLLECT_PATH);
+}
+
+/** Versioned Cache API key; never use this URL for the upstream fetch. */
+export function trackerCacheKeyUrl(upstreamUrl: string): string {
+  const cacheUrl = new URL(upstreamUrl);
+  cacheUrl.searchParams.set("__kc_proxy_transform", TRACKER_CACHE_VERSION);
+  return cacheUrl.toString();
 }
 
 export function matchProxyPath(pathname: string): ProxyRoute | null {
