@@ -3,6 +3,8 @@ import { describe, it } from "node:test";
 import {
   COLLECT_PATH,
   ORIGIN_COLLECT,
+  SCRIPT_PATH,
+  TRACKER_COLLECT_SUFFIX,
   matchProxyPath,
   originBase,
   rewriteTrackerScript,
@@ -21,14 +23,29 @@ describe("originBase", () => {
 });
 
 describe("rewriteTrackerScript", () => {
-  it("points collect calls at the same-origin path", () => {
+  it("points collect calls at the same-origin collector suffix", () => {
     const src = `fetch("${ORIGIN_COLLECT}",{method:"POST"})`;
-    assert.equal(rewriteTrackerScript(src), `fetch("${COLLECT_PATH}",{method:"POST"})`);
+    assert.equal(
+      rewriteTrackerScript(src),
+      `fetch("${TRACKER_COLLECT_SUFFIX}",{method:"POST"})`,
+    );
   });
 
   it("rewrites every occurrence", () => {
     const src = `${ORIGIN_COLLECT} ${ORIGIN_COLLECT}`;
-    assert.equal(rewriteTrackerScript(src), `${COLLECT_PATH} ${COLLECT_PATH}`);
+    assert.equal(
+      rewriteTrackerScript(src),
+      `${TRACKER_COLLECT_SUFFIX} ${TRACKER_COLLECT_SUFFIX}`,
+    );
+  });
+
+  it("makes the tracker's script-relative collector resolve to the public endpoint", () => {
+    const trackerBase = new URL(SCRIPT_PATH, "https://kc.chtnnhfoundation.org").href
+      .split("/")
+      .slice(0, -1)
+      .join("/");
+    assert.equal(`${trackerBase}${TRACKER_COLLECT_SUFFIX}`, "https://kc.chtnnhfoundation.org/s/e");
+    assert.equal(`${trackerBase}${COLLECT_PATH}`, "https://kc.chtnnhfoundation.org/s/s/e");
   });
 
   it("does not rewrite other Umami routes", () => {

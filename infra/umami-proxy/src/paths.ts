@@ -4,11 +4,14 @@ export const SCRIPT_PATH = "/s/x.js";
 export const COLLECT_PATH = "/s/e";
 export const ORIGIN_SCRIPT = "/script.js";
 export const ORIGIN_COLLECT = "/api/send";
+// Umami appends this suffix to the directory containing its tracker script.
+// With /s/x.js, /e produces the public collector endpoint /s/e.
+export const TRACKER_COLLECT_SUFFIX = "/e";
 
 // Bump this whenever the Worker changes the transformed tracker response.
 // Cache API entries outlive Worker deployments, so this avoids serving a
 // response produced by an older transform.
-export const TRACKER_CACHE_VERSION = "v1";
+export const TRACKER_CACHE_VERSION = "v2";
 
 export type ProxyRoute = "script" | "collect";
 
@@ -17,7 +20,7 @@ export function originBase(origin: string): string {
 }
 
 export function rewriteTrackerScript(body: string): string {
-  return body.replaceAll(ORIGIN_COLLECT, COLLECT_PATH);
+  return body.replaceAll(ORIGIN_COLLECT, TRACKER_COLLECT_SUFFIX);
 }
 
 /** Versioned Cache API key; never use this URL for the upstream fetch. */

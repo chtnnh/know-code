@@ -6,7 +6,7 @@ so the browser never talks to a third-party analytics host (ad-blocker bypass).
 
 | Public (docs domain) | Upstream |
 |----------------------|----------|
-| `GET /s/x.js` | `{UMAMI_ORIGIN}/script.js` |
+| `GET /s/x.js` | `{UMAMI_ORIGIN}/script.js` (collector rewritten to `/s/e`) |
 | `POST /s/e` | `{UMAMI_ORIGIN}/api/send` |
 
 Neutral path names (`/s/x.js`, `/s/e`) avoid EasyPrivacy hits on `umami`,

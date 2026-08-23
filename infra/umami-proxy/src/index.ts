@@ -2,7 +2,7 @@
  * Same-origin proxy for self-hosted Umami.
  *
  * Public paths on kc.chtnnhfoundation.org (neutral names — not on blocklists):
- *   GET  /s/x.js  →  {UMAMI_ORIGIN}/script.js   (rewrites /api/send → /s/e)
+ *   GET  /s/x.js  →  {UMAMI_ORIGIN}/script.js   (rewrites its collector to /s/e)
  *   POST /s/e     →  {UMAMI_ORIGIN}/api/send
  *
  * Dashboard and other Umami routes are not exposed. Deploy the Worker first,
