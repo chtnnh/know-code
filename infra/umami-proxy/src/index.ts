@@ -10,7 +10,6 @@
  */
 
 import {
-  COLLECT_PATH,
   ORIGIN_COLLECT,
   ORIGIN_SCRIPT,
   matchProxyPath,

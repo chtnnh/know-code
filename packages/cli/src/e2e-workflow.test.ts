@@ -79,7 +79,7 @@ describe("e2e workflows", () => {
         baseBranch: "trunk",
       });
       writeConfig(root, cfg);
-      const session = beginRangeSession(root, baseOid);
+      beginRangeSession(root, baseOid);
       assert.ok(readRangeSession(root));
 
       writeFile(root, "a.txt", "feat\n");

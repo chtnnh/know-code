@@ -192,7 +192,7 @@ describe("cli surface (spawned)", () => {
       assert.equal(r.status, 0);
       const session = readRangeSession(root);
       assert.ok(session, "expected a new range session");
-      assert.equal(session!.fromOid, head);
+      assert.equal(session?.fromOid, head);
     } finally {
       cleanup();
     }

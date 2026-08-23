@@ -80,7 +80,7 @@ export function cmdGradePropose(opts: { json?: boolean }): void {
   const config = readConfig(repoRoot);
   const ctx = resolveQuizContext(repoRoot, config);
 
-  let answers;
+  let answers: ReturnType<typeof assertAnswersForHash>;
   try {
     answers = assertAnswersForHash(repoRoot, ctx.diffHash);
   } catch (err) {
@@ -155,11 +155,16 @@ async function cmdGradeReview(opts: {
     process.exit(1);
   }
 
-  let answers;
+  let answers: ReturnType<typeof assertAnswersForHash>;
   try {
     answers = assertAnswersForHash(repoRoot, ctx.diffHash);
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+  const answersDigest = answers.answersDigest;
+  if (!answersDigest) {
+    console.error("know-code: answers digest is missing");
     process.exit(1);
   }
 
@@ -168,7 +173,7 @@ async function cmdGradeReview(opts: {
     proposal = assertGradeProposalForHash(
       repoRoot,
       ctx.diffHash,
-      answers.answersDigest!,
+      answersDigest,
     );
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
@@ -243,7 +248,7 @@ async function cmdGradeReview(opts: {
 
   const unsigned = buildGradeReceipt(
     ctx,
-    answers.answersDigest!,
+    answersDigest,
     finalScore,
     level,
     proposal,
@@ -346,11 +351,16 @@ async function cmdGradeSelfScore(opts: {
     process.exit(1);
   }
 
-  let answers;
+  let answers: ReturnType<typeof assertAnswersForHash>;
   try {
     answers = assertAnswersForHash(repoRoot, ctx.diffHash);
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+  const answersDigest = answers.answersDigest;
+  if (!answersDigest) {
+    console.error("know-code: answers digest is missing");
     process.exit(1);
   }
 
@@ -367,7 +377,7 @@ async function cmdGradeSelfScore(opts: {
 
   const unsigned = buildGradeReceipt(
     ctx,
-    answers.answersDigest!,
+    answersDigest,
     score,
     level,
   );

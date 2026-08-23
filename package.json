@@ -11,6 +11,9 @@
     "prepare": "node scripts/link-skills.mjs && node scripts/sync-hooks.mjs",
     "build": "npm run build -w @chtnnh/know-code",
     "build:docs": "npm run build -w website",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format:check": "biome format .",
     "test": "npm run test -w @chtnnh/know-code",
     "smoke": "bash scripts/smoke-enforcement.sh",
     "smoke:verify": "bash scripts/smoke-verify-ci.sh",
@@ -26,5 +29,8 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/chtnnh/know-code.git"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.10"
   }
 }

@@ -116,7 +116,7 @@ function languagesFromPaths(paths: string[]): string[] {
   const counts = new Map<string, number>();
   for (const p of paths) {
     const base = p.split("/").pop() || p;
-    const ext = base.includes(".") ? base.split(".").pop()!.toLowerCase() : "";
+    const ext = base.includes(".") ? base.split(".").pop()?.toLowerCase() ?? "" : "";
     const lang = EXT_LANG[ext];
     if (!lang) continue;
     counts.set(lang, (counts.get(lang) || 0) + 1);

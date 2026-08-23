@@ -11,6 +11,8 @@
   "files": [
     "bin",
     "dist",
+    "!dist/**/*.test.*",
+    "!dist/test-helpers.*",
     "hooks",
     "README.md",
     "LICENSE"

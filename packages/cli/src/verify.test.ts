@@ -133,7 +133,7 @@ describe("verify hash candidates", () => {
       const candidates = collectVerifyHashCandidates(repo, cfg);
       const match = matchHeadTrailer(repo, "HEAD", candidates);
       assert.ok(match);
-      assert.equal(match!.hash, rangeHash);
+      assert.equal(match.hash, rangeHash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -194,10 +194,10 @@ describe("verify hash candidates", () => {
       );
       const range = candidates.find((c) => c.label === "merge-base..HEAD");
       assert.ok(range);
-      assert.equal(range!.hash, passHash);
+      assert.equal(range.hash, passHash);
       const match = matchHeadTrailer(repo, "HEAD", candidates);
       assert.ok(match);
-      assert.equal(match!.hash, passHash);
+      assert.equal(match.hash, passHash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -424,7 +424,7 @@ describe("verify hash candidates", () => {
       const range = candidates.find((c) => c.label === "merge-base..HEAD");
       assert.ok(index);
       assert.ok(range);
-      assert.notEqual(index!.hash, range!.hash);
+      assert.notEqual(index.hash, range.hash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -482,7 +482,7 @@ describe("verify hash candidates", () => {
       );
       const match = matchHeadTrailer(repo, "HEAD", candidates);
       assert.ok(match);
-      assert.equal(match!.hash, stagedHash);
+      assert.equal(match.hash, stagedHash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -692,7 +692,7 @@ describe("verify hash candidates", () => {
         collectVerifyHashCandidates(repo, cfg),
       );
       assert.ok(headMatch);
-      assert.equal(headMatch!.hash, passHash);
+      assert.equal(headMatch.hash, passHash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
@@ -738,7 +738,7 @@ describe("verify hash candidates", () => {
         collectVerifyHashCandidates(repo, cfg),
       );
       assert.ok(headMatch);
-      assert.equal(headMatch!.hash, passHash);
+      assert.equal(headMatch.hash, passHash);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

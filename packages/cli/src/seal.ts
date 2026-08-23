@@ -33,8 +33,6 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
-import { stdin as input, stderr as output } from "node:process";
 import { findGitRoot } from "./paths.js";
 import { readConfig } from "./config.js";
 import { promptSecretHidden } from "./prompt.js";

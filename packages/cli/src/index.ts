@@ -179,7 +179,7 @@ function failAsync(err: unknown): never {
 }
 
 function main(): void {
-  const { command, subcommand, subsub, flags, rest } = parseArgs(
+  const { command, subcommand, flags, rest } = parseArgs(
     process.argv.slice(2),
   );
   const passphrase =

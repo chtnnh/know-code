@@ -22,7 +22,6 @@ import { applyTrailerToRange } from "../trailers.js";
 import type { RangeSealReceipt, RangeSealMode } from "../types.js";
 
 export function cmdRangeBegin(opts: { from?: string }): void {
-  const repoRoot = findGitRoot();
   try {
     const session = beginRangeSession(repoRoot, opts.from);
     console.log(`know-code: range began at ${session.fromOid.slice(0, 12)}…`);
@@ -35,7 +34,6 @@ export function cmdRangeBegin(opts: { from?: string }): void {
 }
 
 export function cmdRangeStatus(json = false): void {
-  const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const session = readRangeSession(repoRoot);
   const state = resolveEffectiveQuizState(repoRoot, config);
@@ -95,7 +93,6 @@ export function cmdRangeAbort(opts: { keepSeal?: boolean } = {}): void {
 }
 
 export function cmdRangeContinue(opts: { yes?: boolean } = {}): void {
-  const repoRoot = findGitRoot();
   if (!opts.yes && process.stdin.isTTY) {
     process.stderr.write(
       "Start a new range for upcoming commits? Run with --yes to confirm.\n",
@@ -208,7 +205,7 @@ export async function cmdRangeSeal(opts: {
     rangeFromOid: fromOid,
     commitCount: ctx.commitCount,
     sealMode,
-    gateKeyId: gate!.keyId || "unsigned",
+    gateKeyId: gate?.keyId || "unsigned",
     sealedAt: new Date().toISOString(),
     sealedHeadOid,
     ...(commitDrift ? { gatePassHash: effectiveHash } : {}),

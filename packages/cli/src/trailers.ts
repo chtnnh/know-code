@@ -115,7 +115,7 @@ fi
   }
 
   // Drop filter-branch backup refs to avoid clutter (best-effort).
-  git(["update-ref", "-d", "refs/original/refs/heads/" + branchName(repoRoot)], repoRoot, {
+  git(["update-ref", "-d", `refs/original/refs/heads/${branchName(repoRoot)}`], repoRoot, {
     allowFail: true,
   });
   git(["for-each-ref", "--format=%(refname)", "refs/original/"], repoRoot, {
