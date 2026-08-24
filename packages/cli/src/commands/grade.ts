@@ -10,6 +10,7 @@ import {
 import {
   assertGradeProposalForHash,
   proposalDigest,
+  writeGradeProposal,
   type GradeProposal,
 } from "../grading.js";
 import { resolveQuizContext } from "../hash.js";
@@ -75,7 +76,7 @@ function buildGradeReceipt(
   return receipt;
 }
 
-export function cmdGradePropose(opts: { json?: boolean }): void {
+export function cmdGradePropose(opts: { json?: boolean; write?: boolean }): void {
   const repoRoot = findGitRoot();
   const config = readConfig(repoRoot);
   const ctx = resolveQuizContext(repoRoot, config);
@@ -87,6 +88,10 @@ export function cmdGradePropose(opts: { json?: boolean }): void {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);
   }
+  const answersDigest = answers.answersDigest;
+  if (!answersDigest) {
+    throw new Error("know-code: answers.json missing answers digest");
+  }
 
   let quiz: QuizSpec | null = null;
   const qPath = quizPath(repoRoot);
@@ -96,7 +101,7 @@ export function cmdGradePropose(opts: { json?: boolean }): void {
 
   const context = {
     diffHash: ctx.diffHash,
-    answersDigest: answers.answersDigest,
+    answersDigest,
     level: resolveLevel(repoRoot, answers.level),
     scope: ctx.scope,
     passScore: PASS_SCORE,
@@ -107,7 +112,7 @@ export function cmdGradePropose(opts: { json?: boolean }): void {
     proposalSchema: {
       version: 1,
       diffHash: ctx.diffHash,
-      answersDigest: answers.answersDigest,
+      answersDigest,
       proposedScore: 0.85,
       passed: true,
       perQuestion: (quiz?.questions ?? []).map((q) => ({
@@ -120,6 +125,29 @@ export function cmdGradePropose(opts: { json?: boolean }): void {
       gradedAt: new Date().toISOString(),
     },
   };
+
+  if (opts.write) {
+    writeGradeProposal(repoRoot, {
+      version: 1,
+      diffHash: ctx.diffHash,
+      answersDigest,
+      proposedScore: 0,
+      passed: false,
+      perQuestion: (quiz?.questions ?? []).map((q) => ({
+        id: q.id,
+        score: 0,
+        feedback: "Replace with an evidence-based assessment.",
+      })),
+      rubricVersion: "1",
+      gradedBy: "agent-template",
+      gradedAt: new Date().toISOString(),
+      level: resolveLevel(repoRoot, answers.level),
+    });
+    console.log(
+      "know-code: wrote a failing grade-proposal template; the agent must assess every answer before human review.",
+    );
+    return;
+  }
 
   if (opts.json) {
     console.log(JSON.stringify(context, null, 2));
@@ -283,9 +311,10 @@ export async function cmdGrade(opts: {
   review?: boolean;
   accept?: boolean;
   json?: boolean;
+  write?: boolean;
 }): Promise<void> {
   if (opts.subcommand === "propose") {
-    cmdGradePropose({ json: opts.json });
+    cmdGradePropose({ json: opts.json, write: opts.write });
     return;
   }
 

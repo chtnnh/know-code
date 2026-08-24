@@ -25,6 +25,7 @@ import {
   writeFile,
   commitAll,
   liteConfig,
+  setupOpenGate,
   writeCommitEditMsg,
 } from "./test-helpers.js";
 import { messageWithTrailer } from "./trailers.js";
@@ -60,6 +61,36 @@ describe("e2e workflows", () => {
       const msg = injectTrailer(["-m", "feat: change"], hash)[1];
       writeCommitEditMsg(root, msg);
       assert.equal(runCheck(root).allowed, true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("requireTrailer denial points to commit, which supplies the grounded pending trailer", () => {
+    const { root, cleanup } = withTempRepo("kc-e2e-trailer-next-");
+    try {
+      const { hash } = setupOpenGate(root, { requireTrailer: true });
+      const denied = runCheck(root);
+      assert.equal(denied.allowed, false);
+      assert.equal(denied.next, 'know-code commit -m "…"');
+
+      writeCommitEditMsg(root, injectTrailer(["-m", "feat: change"], hash)[1]);
+      assert.equal(runCheck(root).allowed, true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("a pushed HEAD changed after pass points to the state-changing re-teach flow", () => {
+    const { root, cleanup } = withTempRepo("kc-e2e-head-next-");
+    try {
+      setupOpenGate(root, { requireTrailer: false });
+      writeFile(root, "after-pass.txt", "new tip\n");
+      commitAll(root, "feat: after pass");
+
+      const denied = runCheck(root, { push: true });
+      assert.equal(denied.allowed, false);
+      assert.equal(denied.next, "know-code taught");
     } finally {
       cleanup();
     }

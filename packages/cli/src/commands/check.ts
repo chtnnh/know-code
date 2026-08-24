@@ -76,7 +76,9 @@ export function runCheck(
       allowed: false,
       reason:
         "HEAD tree changed since pass — amended commits or extra work on tip?",
-      next: "know-code status",
+      // Status only diagnoses this condition. A new taught seal starts the
+      // required state-changing flow for the changed tip.
+      next: "know-code taught",
     };
   }
 
