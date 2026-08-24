@@ -55,7 +55,7 @@ function pushCorrupt(
 export function evaluatePipeline(repoRoot: string): PipelineStatus {
   const config = readConfig(repoRoot);
   const state = resolveEffectiveQuizState(repoRoot, config);
-  const { ctx, effectiveHash: hash, commitDrift } = state;
+  const { effectiveHash: hash, commitDrift } = state;
   const blockers: PipelineBlocker[] = [];
 
   const meta = readAttestMeta(repoRoot);
@@ -68,11 +68,7 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
   }
 
   const session = readRangeSession(repoRoot);
-  if (
-    config.rangeMode === "range" &&
-    !session &&
-    ctx.scope !== "range"
-  ) {
+  if (config.rangeMode === "range" && !session) {
     blockers.push({
       step: "range",
       message: "Range mode requires active range session",
@@ -104,7 +100,7 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
     blockers.push({
       step: "quiz",
       message: "quiz.json missing",
-      command: "know-code questions && write .know-code/quiz.json",
+      command: "know-code quiz init",
     });
   }
 
@@ -149,7 +145,7 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
           message: proposal
             ? "grade-proposal.json stale or mismatched"
             : "Agent grading proposal missing",
-          command: "Agent: write .know-code/grade-proposal.json after ask",
+          command: "know-code grade propose --write",
         });
       }
     }
@@ -211,7 +207,7 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
         step: "pass",
         message:
           "Unstaged tracked edits close the gate (git add or stash)",
-        command: "git add -A",
+        command: "git add -u",
       });
     } else if (
       gate.gatedTreeOid &&
@@ -240,7 +236,7 @@ export function evaluatePipeline(repoRoot: string): PipelineStatus {
       blockers.push({
         step: "pass",
         message: "Gate closed (see know-code status --json)",
-        command: "know-code status",
+        command: "know-code pass",
       });
     }
   }
@@ -269,11 +265,11 @@ export function formatCheckDeny(
       !commitDrift
     ) {
       reason =
-        "Diff hash changed — you may have staged new changes or amended commits. Run `know-code status`.";
+        "Diff hash changed — you may have staged new changes or amended commits. Run `know-code pass` to seal the current hash.";
     }
     return {
       reason,
-      next: b.command || "know-code status",
+      next: b.command || "know-code taught",
     };
   }
 
@@ -287,7 +283,7 @@ export function formatCheckDeny(
     return {
       reason:
         "diff changed since last quiz — staged new work or amended commits?",
-      next: "know-code status",
+      next: "know-code taught",
     };
   }
   if (!receipt.gatedTreeOid) {

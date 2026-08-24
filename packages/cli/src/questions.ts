@@ -2,10 +2,12 @@
  * Minimum quiz question count from diff shape + level.
  * Agents MUST run `know-code questions` before writing quiz.json.
  */
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { readConfig } from "./config.js";
 import { git, mergeBase, resolveBaseRef, revListCount } from "./git.js";
 import { resolveQuizContext } from "./hash.js";
-import { findGitRoot } from "./paths.js";
+import { findGitRoot, quizPath } from "./paths.js";
 import { readRangeSession } from "./range.js";
 import { isLevel, type Level } from "./types.js";
 
@@ -288,5 +290,29 @@ export function cmdQuestions(opts: {
   }
   console.log(
     `know-code: write exactly ${result.minQuestions} questions in .know-code/quiz.json (not fewer).`,
+  );
+}
+
+/** Write a quota-correct quiz scaffold for the current hash. */
+export function cmdQuizInit(): void {
+  const repoRoot = findGitRoot();
+  const config = readConfig(repoRoot);
+  const fromRef = resolveQuotaFrom(repoRoot, config.baseBranch);
+  const signals = collectQuotaSignals(repoRoot, config.level, fromRef);
+  const quota = computeQuestionQuota(signals);
+  const ctx = resolveQuizContext(repoRoot, config);
+  const template = {
+    diffHash: ctx.diffHash,
+    level: config.level,
+    title: "know-code quiz",
+    questions: Array.from({ length: quota.minQuestions }, (_, i) => ({
+      id: `q${i + 1}`,
+      prompt: "Replace with a diff-specific question.",
+    })),
+  };
+  mkdirSync(join(quizPath(repoRoot), ".."), { recursive: true });
+  writeFileSync(quizPath(repoRoot), `${JSON.stringify(template, null, 2)}\n`);
+  console.log(
+    `know-code: wrote ${quota.minQuestions}-question quiz scaffold; replace every placeholder prompt, then run know-code quiz validate.`,
   );
 }

@@ -30,7 +30,7 @@ import { CANONICAL_FLOW } from "./grading.js";
 import { findGitRoot } from "./paths.js";
 import { uninstallGitHooks, uninstallAgentHooks, cmdHooksInstall } from "./hooks.js";
 import { cmdOverride } from "./override.js";
-import { cmdQuestions } from "./questions.js";
+import { cmdQuestions, cmdQuizInit } from "./questions.js";
 import { cmdAttestInit } from "./seal.js";
 
 function packageVersion(): string {
@@ -58,7 +58,7 @@ Usage:
   know-code doctor [--json] [--strict]
   know-code range begin|status|seal|abort|continue [--from <ref>] [--rewrite] [--keep-seal] [--yes]
   know-code questions [--json] [--template] [--from <ref>] [--level …]
-  know-code quiz validate [--path .know-code/quiz.json] [--json]
+  know-code quiz init|validate [--path .know-code/quiz.json] [--json]
   know-code taught [--skip] [--hash <diffHash>] [--passphrase <secret>]
   know-code ask [--quiz .know-code/quiz.json] [--port 3847] [--timeout 1800] [--no-open]
   know-code grade propose [--json]
@@ -277,6 +277,10 @@ function main(): void {
         });
         break;
       case "quiz":
+        if (subcommand === "init") {
+          cmdQuizInit();
+          break;
+        }
         if (subcommand === "validate") {
           cmdQuizValidate({
             path: typeof flags.path === "string" ? flags.path : undefined,
@@ -284,7 +288,7 @@ function main(): void {
           });
           break;
         }
-        console.error("know-code quiz: use validate\n");
+        console.error("know-code quiz: use init | validate\n");
         process.exit(1);
         break;
       case "check":
@@ -313,6 +317,7 @@ function main(): void {
           review: flags.review === true,
           accept: flags.accept === true,
           json: flags.json === true,
+          write: flags.write === true,
         }).catch(failAsync);
         return;
       case "pass":
