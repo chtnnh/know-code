@@ -32,7 +32,7 @@ Ask for a decision only when it matters. Examples:
 
 ## After the first teach beat
 
-Ask the human to seal understanding for the current quiz hash (`know-code hash`):
+After the final intended diff is staged, ask the human to seal understanding for the current quiz hash (`know-code hash`):
 
 ```bash
 know-code taught

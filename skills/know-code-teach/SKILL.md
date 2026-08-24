@@ -49,11 +49,11 @@ While coding, keep explanations **incremental**: after meaningful chunks, narrat
 | `know-code-teach` | Build understanding **before/during** work |
 | `know-code` | Verify understanding before commit/push/PR |
 
-**Required order:** `range begin` → teach → human seals `know-code taught` → edit → (teach deltas) → `questions` → quiz → ask → agent `grade-proposal.json` → human `grade --review` → `pass` → `know-code commit` → `range seal` / push.
+**Required order:** `range begin` → teach → implement and stage the final diff → human seals `know-code taught` → `questions` → quiz → ask → agent `grade-proposal.json` → human `grade --review` → `pass` → `know-code commit` → `range seal` / push.
 
 Re-seal **`know-code taught`** when the diff hash changes (`know-code hash`).
 
-After teaching (or an explicit human skip), the **human** seals the artifact (passphrase; agents cannot forge):
+After teaching, implementation, and staging (or an explicit human skip), the **human** seals the final artifact (passphrase; agents cannot forge):
 
 ```bash
 know-code taught

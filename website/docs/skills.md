@@ -28,8 +28,8 @@ Skip only if you explicitly say so ("skip teach", "just do it") — then you sti
 | Step | Who | Action |
 |------|-----|--------|
 | 1 | **You** | `know-code range begin` (multi-commit batches) |
-| 2 | **Agent** | Teach (or you skipped) |
-| 3 | **You** | `know-code taught` |
+| 2 | **Agent** | Teach, implement, and explain the final staged diff (or you skipped) |
+| 3 | **You** | `know-code taught` for that final staged hash |
 | 4 | **Agent** | `questions` → write `quiz.json` → `quiz validate` |
 | 5 | **Agent** | `know-code ask` → **you** answer in browser |
 | 6 | **Agent** | Write `grade-proposal.json` |
