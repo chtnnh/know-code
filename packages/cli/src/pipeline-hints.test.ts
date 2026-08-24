@@ -5,9 +5,10 @@ import { join } from "node:path";
 
 import { writeAnswers, writeGrade, writeTaught } from "./attest.js";
 import { writeConfig } from "./config.js";
-import { computeDiffContext } from "./hash.js";
-import { evaluatePipeline } from "./pipeline.js";
-import { commitAll, liteConfig, setupOpenGate, withTempRepo, writeFile } from "./test-helpers.js";
+import { readGateSafe } from "./gate.js";
+import { computeDiffContext, resolveQuizContext } from "./hash.js";
+import { evaluatePipeline, formatCheckDeny } from "./pipeline.js";
+import { commitAll, git, liteConfig, setupOpenGate, withTempRepo, writeFile } from "./test-helpers.js";
 
 function blockerCommand(repoRoot: string, step: string): string | undefined {
   return evaluatePipeline(repoRoot).blockers.find((blocker) => blocker.step === step)
@@ -154,5 +155,22 @@ describe("pipeline recovery hints", () => {
       "know-code reset",
       "know-code taught",
     ]);
+  });
+
+  it("keeps a stale-pass deny reason aligned with its pass recovery command", () => {
+    const { root, cleanup } = withTempRepo("kc-hint-stale-pass-");
+    try {
+      const { cfg } = setupOpenGate(root, { requireTrailer: false });
+      writeFile(root, "a.txt", "changed\n");
+      git(root, ["add", "a.txt"]);
+      seedWorkflowArtifacts(root);
+
+      const ctx = resolveQuizContext(root, cfg);
+      const denied = formatCheckDeny(root, cfg, ctx, readGateSafe(root));
+      assert.equal(denied.next, "know-code pass");
+      assert.match(denied.reason, /Run `know-code pass`/);
+    } finally {
+      cleanup();
+    }
   });
 });

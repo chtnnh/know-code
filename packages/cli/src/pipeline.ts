@@ -265,7 +265,7 @@ export function formatCheckDeny(
       !commitDrift
     ) {
       reason =
-        "Diff hash changed — you may have staged new changes or amended commits. Re-seal teaching for the final staged diff.";
+        "Diff hash changed — you may have staged new changes or amended commits. Run `know-code pass` to seal the current hash.";
     }
     return {
       reason,
