@@ -10,8 +10,23 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeConfig } from "./config.js";
+import {
+  answersDigest,
+  writeAnswers,
+  writeGrade,
+  writeTaught,
+} from "./attest.js";
+import { readConfig, writeConfig } from "./config.js";
+import { cmdStatus } from "./commands/status.js";
+import { materializedTreeOid, readGate, writeGate } from "./gate.js";
+import { computeDiffContext } from "./hash.js";
 import { readRangeSession, writeRangeSeal } from "./range.js";
+import {
+  initAttestKey,
+  readAttestMeta,
+  signPayload,
+  verifyPayload,
+} from "./seal.js";
 import {
   commitAll,
   git,
@@ -169,6 +184,96 @@ describe("cli surface (spawned)", () => {
       assert.match(p2.taughtDetail, /unstaged edits present — git add or stash/);
       assert.equal(p2.unstagedTrackedEdits, true);
     } finally {
+      cleanup();
+    }
+  });
+
+  it("status separates receipt signature validity from a missing pending trailer", () => {
+    const { root, cleanup } = withTempRepo("kc-cli-status-receipt-");
+    const attestHome = mkdtempSync(join(tmpdir(), "kc-attest-"));
+    const priorAttestHome = process.env.KNOW_CODE_ATTEST_HOME;
+    try {
+      setupRepo(root, liteConfig({ requireTrailer: true }));
+      const repoRoot = git(root, ["rev-parse", "--show-toplevel"]);
+      process.env.KNOW_CODE_ATTEST_HOME = attestHome;
+      initAttestKey(repoRoot, "test-passphrase");
+      const hash = computeDiffContext(repoRoot, readConfig(repoRoot)).diffHash;
+      const gate = {
+        version: 1 as const,
+        diffHash: hash,
+        level: "lite" as const,
+        passedAt: new Date().toISOString(),
+        commitRange: "x",
+        baseRef: "y",
+        headRef: git(repoRoot, ["rev-parse", "HEAD"]),
+        gatedTreeOid: materializedTreeOid(repoRoot),
+      };
+      const signed = signPayload(repoRoot, "test-passphrase", gate);
+      writeGate(repoRoot, { ...gate, ...signed });
+      const pub = readAttestMeta(repoRoot)?.pubKey;
+      assert.ok(pub, "expected test attest public key");
+      assert.equal(
+        verifyPayload(
+          pub,
+          readGate(repoRoot) as unknown as Record<string, unknown> & {
+            sig?: string;
+            keyId?: string;
+          },
+        ),
+        true,
+      );
+      writeTaught(repoRoot, {
+        version: 1,
+        diffHash: hash,
+        taughtAt: new Date().toISOString(),
+        skipped: false,
+      });
+      writeFileSync(join(repoRoot, ".know-code", "quiz.json"), "{}\n");
+      const answers = {
+        diffHash: hash,
+        answers: [{ id: "q1", answer: "understood" }],
+        submittedAt: new Date().toISOString(),
+      };
+      writeAnswers(repoRoot, answers);
+      writeGrade(repoRoot, {
+        version: 1,
+        diffHash: hash,
+        score: 1,
+        passed: true,
+        gradedAt: new Date().toISOString(),
+        answersDigest: answersDigest(answers),
+      });
+
+      const previousCwd = process.cwd();
+      const log = console.log;
+      let output = "";
+      console.log = (line: string) => {
+        output += line;
+      };
+      process.chdir(root);
+      let payload: Record<string, unknown>;
+      try {
+        cmdStatus({ json: true });
+        payload = JSON.parse(output);
+      } finally {
+        process.chdir(previousCwd);
+        console.log = log;
+      }
+      assert.equal(payload.allowed, false);
+      assert.equal(payload.attestReady, true);
+      assert.equal(payload.receiptSealed, true);
+      assert.deepEqual(payload.blockers, [
+        {
+          step: "check",
+          message: "requireTrailer: HEAD missing Know-Code-Verified trailer",
+          command: 'know-code commit -m "…"',
+        },
+      ]);
+      assert.equal(payload.nextStep, 'know-code commit -m "…"');
+    } finally {
+      if (priorAttestHome === undefined) delete process.env.KNOW_CODE_ATTEST_HOME;
+      else process.env.KNOW_CODE_ATTEST_HOME = priorAttestHome;
+      rmSync(attestHome, { recursive: true, force: true });
       cleanup();
     }
   });
