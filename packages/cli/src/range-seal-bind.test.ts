@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeConfig } from "./config.js";
@@ -17,6 +17,42 @@ import type { RangeSealReceipt } from "./types.js";
 import { git, withTempRepo, writeFile, commitAll } from "./test-helpers.js";
 
 describe("sealed head binding trust", () => {
+  it("ignores a stale seal after a newer pass without its own sealed tip", () => {
+    const { root, cleanup } = withTempRepo("kc-bind-read-supersede-");
+    try {
+      writeFile(root, "f.txt", "base\n");
+      commitAll(root, "sealed batch tip");
+      const sealedTip = git(root, ["rev-parse", "HEAD"]);
+      mkdirSync(join(root, ".know-code"), { recursive: true });
+      writeConfig(root, { ...DEFAULT_CONFIG, level: "lite", requireAttest: false });
+      writeRangeSeal(root, {
+        version: 1,
+        diffHash: "a".repeat(64),
+        rangeFromOid: sealedTip,
+        commitCount: 1,
+        sealMode: "receipt",
+        gateKeyId: "unsigned",
+        sealedAt: "2026-01-01T00:00:00.000Z",
+        sealedHeadOid: sealedTip,
+      });
+      writeGate(root, {
+        version: 1,
+        diffHash: "b".repeat(64),
+        level: "lite",
+        passedAt: "2026-01-02T00:00:00.000Z",
+        commitRange: `${sealedTip}..HEAD`,
+        baseRef: sealedTip,
+        headRef: sealedTip,
+        gatedTreeOid: git(root, ["rev-parse", "HEAD^{tree}"]),
+      });
+
+      assert.equal(sealedHeadBinding(root), null);
+      assert.equal(headMatchesRangeSeal(root), true);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("ignores unsigned forged range-seal when requireAttest is true", async () => {
     const attestHome = mkdtempSync(join(tmpdir(), "kc-bind-home-"));
     const prevHome = process.env.KNOW_CODE_ATTEST_HOME;
@@ -73,6 +109,62 @@ describe("sealed head binding trust", () => {
       else process.env.KNOW_CODE_ATTEST_HOME = prevHome;
       if (prevPass === undefined) delete process.env.KNOW_CODE_ATTEST_PASSPHRASE;
       else process.env.KNOW_CODE_ATTEST_PASSPHRASE = prevPass;
+      rmSync(attestHome, { recursive: true, force: true });
+      cleanup();
+    }
+  });
+
+  it("supersedes a signed standalone binding only with a newer signed unbound gate", async () => {
+    const attestHome = mkdtempSync(join(tmpdir(), "kc-bind-supersede-"));
+    const prevHome = process.env.KNOW_CODE_ATTEST_HOME;
+    const { root, cleanup } = withTempRepo("kc-bind-signed-supersede-");
+    try {
+      process.env.KNOW_CODE_ATTEST_HOME = attestHome;
+      initAttestKey(root, "bind-pass");
+      writeFile(root, "f.txt", "base\n");
+      commitAll(root, "sealed batch tip");
+      const sealedTip = git(root, ["rev-parse", "HEAD"]);
+      mkdirSync(join(root, ".know-code"), { recursive: true });
+      writeConfig(root, { ...DEFAULT_CONFIG, level: "lite", requireAttest: true });
+
+      const binding = await sealPayload(
+        root,
+        {
+          version: 1,
+          sealedHeadOid: sealedTip,
+          boundAt: "2026-01-01T00:00:00.000Z",
+        },
+        { passphrase: "bind-pass" },
+      );
+      writeFileSync(
+        join(root, ".know-code", "sealed-head-binding.json"),
+        `${JSON.stringify(binding, null, 2)}\n`,
+      );
+
+      const newerGate = {
+        version: 1 as const,
+        diffHash: "b".repeat(64),
+        level: "lite" as const,
+        passedAt: "2026-01-02T00:00:00.000Z",
+        commitRange: `${sealedTip}..HEAD`,
+        baseRef: sealedTip,
+        headRef: sealedTip,
+        gatedTreeOid: git(root, ["rev-parse", "HEAD^{tree}"]),
+      };
+      // An agent-written/unsigned gate cannot supersede a human-signed binding.
+      writeGate(root, newerGate);
+      assert.equal(sealedHeadBinding(root), sealedTip);
+
+      const signedGate = await sealPayload(
+        root,
+        newerGate as unknown as Record<string, unknown>,
+        { passphrase: "bind-pass" },
+      );
+      writeGate(root, signedGate as typeof newerGate);
+      assert.equal(sealedHeadBinding(root), null);
+    } finally {
+      if (prevHome === undefined) delete process.env.KNOW_CODE_ATTEST_HOME;
+      else process.env.KNOW_CODE_ATTEST_HOME = prevHome;
       rmSync(attestHome, { recursive: true, force: true });
       cleanup();
     }
