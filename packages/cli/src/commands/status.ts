@@ -53,7 +53,8 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   );
   const session = readRangeSession(repoRoot);
   const receipt = readGateSafe(repoRoot);
-  const allowed = runCheck(repoRoot).allowed;
+  const check = runCheck(repoRoot);
+  const allowed = check.allowed;
   const from = mergeBase(repoRoot, ctx.baseRef, ctx.headRef);
   const stat = diffStat(repoRoot, from, ctx.headRef);
   const log = logOneline(repoRoot, from, ctx.headRef);
@@ -67,6 +68,16 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   const proposal = proposalR.value;
   const meta = readAttestMeta(repoRoot);
   const pub = meta?.pubKey;
+  const receiptSealed =
+    !!receipt &&
+    !!pub &&
+    verifyPayload(
+      pub,
+      receipt as unknown as Record<string, unknown> & {
+        sig?: string;
+        keyId?: string;
+      },
+    );
   const taughtOk =
     !!taught &&
     taught.diffHash === effectiveHash &&
@@ -79,6 +90,13 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     verifyPayload(pub, grade as unknown as Record<string, unknown> & { sig?: string; keyId?: string });
 
   const pipeline = evaluatePipeline(repoRoot);
+  const blockers =
+    !allowed && pipeline.blockers.length === 0 && check.reason
+      ? [
+          ...pipeline.blockers,
+          { step: "check", message: check.reason, command: check.next },
+        ]
+      : pipeline.blockers;
   const unstaged = hasUnstagedTrackedChanges(repoRoot);
   const taughtStaleDetail = taughtR.corrupt
     ? "corrupt"
@@ -95,8 +113,8 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
 
   const payload = {
     allowed,
-    nextStep: pipeline.nextStep,
-    blockers: pipeline.blockers,
+    nextStep: blockers[0]?.command ?? pipeline.nextStep,
+    blockers,
     level: config.level,
     baseBranch: config.baseBranch,
     attestKeyId: meta?.keyId || null,
@@ -112,6 +130,7 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
     headRef: ctx.headRef,
     commitRange: ctx.commitRange,
     receipt,
+    receiptSealed,
     taught: taughtR.corrupt
       ? "corrupt"
       : taught?.diffHash === effectiveHash
@@ -147,12 +166,13 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
 
   console.log(`know-code status`);
   console.log(`  commit/push allowed: ${allowed ? "yes" : "no"}`);
-  if (pipeline.nextStep) {
-    console.log(`  next:         ${pipeline.nextStep}`);
+  const nextStep = blockers[0]?.command ?? pipeline.nextStep;
+  if (nextStep) {
+    console.log(`  next:         ${nextStep}`);
   }
-  if (opts.next !== false && pipeline.blockers.length) {
+  if (opts.next !== false && blockers.length) {
     console.log(`  blockers:`);
-    for (const b of pipeline.blockers) {
+    for (const b of blockers) {
       console.log(`    - ${b.step}: ${b.message}`);
     }
   }
@@ -171,7 +191,7 @@ export function cmdStatus(opts: { json?: boolean; next?: boolean } = {}): void {
   console.log(`  base:         ${ctx.baseRef}`);
   if (receipt) {
     console.log(
-      `  receipt:      ${receipt.level} @ ${receipt.passedAt} (${receipt.diffHash.slice(0, 12)}…) sealed=${allowed ? "yes" : "no"}`,
+      `  receipt:      ${receipt.level} @ ${receipt.passedAt} (${receipt.diffHash.slice(0, 12)}…) sealed=${receiptSealed ? "yes" : "no"}`,
     );
   } else {
     console.log(`  receipt:      (none)`);
