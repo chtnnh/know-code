@@ -65,19 +65,38 @@ function trustedSealedOid(
   }
 }
 
+/** A newer valid pass without its own sealed tip supersedes stale seal artifacts. */
+function newerGateSupersedesSeal(repoRoot: string, sealedAt: string | undefined): boolean {
+  if (!sealedAt) return false;
+  const gate = readGateSafe(repoRoot);
+  if (!gate?.passedAt || gate.sealedHeadOid) return false;
+  if (readConfig(repoRoot).requireAttest) {
+    try {
+      assertSigned(repoRoot, "gate.json", gate as unknown as Record<string, unknown> & { sig?: string; keyId?: string });
+    } catch {
+      return false;
+    }
+  }
+  return Date.parse(gate.passedAt) > Date.parse(sealedAt);
+}
+
 /** Bound tip from range-seal, sealed-head-binding, or gate (redundant sources). */
 export function sealedHeadBinding(repoRoot: string): string | null {
   const config = readConfig(repoRoot);
   // Prefer signed range-seal; then gate. Standalone binding file only when attest
   // is on (unsigned agent-minted binding must not bind HEAD when attest is off).
+  const seal = readRangeSeal(repoRoot);
+  const binding = readSealedHeadBindingFile(repoRoot);
   return (
-    trustedSealedOid(repoRoot, "range-seal.json", readRangeSeal(repoRoot)) ??
+    (!newerGateSupersedesSeal(repoRoot, seal?.sealedAt)
+      ? trustedSealedOid(repoRoot, "range-seal.json", seal)
+      : null) ??
     (config.requireAttest
-      ? trustedSealedOid(
+      ? !newerGateSupersedesSeal(repoRoot, binding?.boundAt) ? trustedSealedOid(
           repoRoot,
           "sealed-head-binding.json",
-          readSealedHeadBindingFile(repoRoot),
-        )
+          binding,
+        ) : null
       : null) ??
     trustedSealedOid(repoRoot, "gate.json", readGateSafe(repoRoot))
   );
