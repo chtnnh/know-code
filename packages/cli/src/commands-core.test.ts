@@ -254,8 +254,14 @@ describe("commands: config / init / quiz / doctor / reset / ship", () => {
 
   it("consumerWorkflowYaml pins action, base branch, PR tip, and push walk", () => {
     const yml = consumerWorkflowYaml("develop");
+    const packageVersion = JSON.parse(
+      readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf8"),
+    ) as { version: string };
     assert.match(yml, /base-branch: develop/);
-    assert.match(yml, /chtnnh\/know-code\/action@v0\.3\.0/);
+    assert.match(
+      yml,
+      new RegExp(`chtnnh/know-code/action@v${packageVersion.version.replaceAll(".", "\\.")}`),
+    );
     assert.match(yml, /actions\/checkout@v5/);
     assert.match(yml, /pull_request:/);
     assert.match(yml, /push:/);

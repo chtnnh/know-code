@@ -6,6 +6,9 @@ name: release
 #   Workflow filename: release.yml   (filename only, not a path)
 #   Environment: npm-release         (must match job.environment)
 # No NPM_TOKEN / NODE_AUTH_TOKEN — those block OIDC.
+# Protect v* tags from updates and deletion with a repository ruleset. The
+# runtime checks below detect in-flight changes, but protection closes the
+# unavoidable race after the final remote-tag fetch.
 on:
   push:
     tags:
@@ -14,6 +17,7 @@ on:
 permissions:
   contents: write
   id-token: write # required for npm OIDC
+  pages: write
 
 jobs:
   publish:
@@ -21,6 +25,8 @@ jobs:
     environment: npm-release
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       # Node 24 → npm ≥ 11.5.1 (required for trusted publishing).
       # Do NOT set registry-url: setup-node would inject a dummy NODE_AUTH_TOKEN
@@ -35,20 +41,133 @@ jobs:
       - run: npm run build
       - run: npm test
 
+      - name: Verify release tag matches CLI package version
+        run: node scripts/check-release-tag.mjs
+
+      - name: Verify main contains and declares this release
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+          [[ "$(git show origin/main:website/versions.json | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => console.log(JSON.parse(s)[0]))')" == "${GITHUB_REF_NAME#v}" ]]
+          node scripts/check-release-docs-provenance.mjs "${GITHUB_SHA}" origin/main
+
+      - name: Build frozen release docs
+        env:
+          UMAMI_WEBSITE_ID: ${{ vars.UMAMI_WEBSITE_ID }}
+        run: npm run build:docs
+
+      - name: Reverify main immediately before publication
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+          [[ "$(git show origin/main:website/versions.json | node -e 'let s=""; process.stdin.on("data", c => s += c).on("end", () => console.log(JSON.parse(s)[0]))')" == "${GITHUB_REF_NAME#v}" ]]
+          node scripts/check-release-docs-provenance.mjs "${GITHUB_SHA}" origin/main
+          git fetch origin "+refs/tags/${GITHUB_REF_NAME}:refs/know-code/release-tag"
+          [[ "$(git rev-parse refs/know-code/release-tag^{commit})" == "$(git rev-parse "${GITHUB_SHA}^{commit}")" ]]
+
       - name: Publish CLI to npm (OIDC)
         working-directory: packages/cli
         run: |
           unset NODE_AUTH_TOKEN
-          npm publish --access public
+          PACKAGE_VERSION="$(npm pkg get version --workspaces=false | tr -d '"')"
+          verify_provenance() {
+            npm view "@chtnnh/know-code@${PACKAGE_VERSION}" dist.attestations --json >/tmp/know-code-attestations.json || return 1
+            node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")); if (!value || typeof value !== "object" || !value.provenance || typeof value.provenance !== "object" || value.provenance.predicateType !== "https://slsa.dev/provenance/v1") process.exit(1)' < /tmp/know-code-attestations.json || return 1
+            VERIFY_DIR="$(mktemp -d)" || return 1
+            trap 'rm -rf "${VERIFY_DIR}"' RETURN
+            (cd "${VERIFY_DIR}" && npm init --yes >/dev/null) || return 1
+            npm install --prefix "${VERIFY_DIR}" --ignore-scripts "@chtnnh/know-code@${PACKAGE_VERSION}" || return 1
+            npm audit signatures --prefix "${VERIFY_DIR}" --json || return 1
+          }
+          if npm view "@chtnnh/know-code@${PACKAGE_VERSION}" gitHead --json >/tmp/know-code-version.json 2>/tmp/know-code-version.err; then
+            PUBLISHED_GIT_HEAD="$(node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")); if (typeof value !== "string" || !/^[0-9a-f]{40}$/i.test(value)) process.exit(1); process.stdout.write(value)' < /tmp/know-code-version.json)"
+            EXPECTED_GIT_HEAD="$(git rev-parse "${GITHUB_SHA}^{commit}")"
+            if [[ "${PUBLISHED_GIT_HEAD}" != "${EXPECTED_GIT_HEAD}" ]]; then
+              echo "@chtnnh/know-code@${PACKAGE_VERSION} belongs to ${PUBLISHED_GIT_HEAD}, not ${EXPECTED_GIT_HEAD}." >&2
+              exit 1
+            fi
+            verify_provenance
+            echo "@chtnnh/know-code@${PACKAGE_VERSION} is already published from this tag; skipping npm publish."
+          elif grep -q "E404" /tmp/know-code-version.err; then
+            npm publish --provenance --access public
+            for attempt in {1..12}; do
+              if verify_provenance; then exit 0; fi
+              sleep 5
+            done
+            echo "npm provenance did not become verifiable for @chtnnh/know-code@${PACKAGE_VERSION}." >&2
+            exit 1
+          else
+            cat /tmp/know-code-version.err >&2
+            exit 1
+          fi
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
+          git fetch origin "+refs/tags/${TAG}:refs/know-code/release-tag"
+          [[ "$(git rev-parse refs/know-code/release-tag^{commit})" == "$(git rev-parse "${GITHUB_SHA}^{commit}")" ]]
           NOTES="Release ${TAG}. See CHANGELOG.md."
           if [[ -f CHANGELOG.md ]]; then
             NOTES="$(sed -n "/^## ${TAG#v}/,/^## /p" CHANGELOG.md | sed '$d' || true)"
             [[ -n "$NOTES" ]] || NOTES="Release ${TAG}. See CHANGELOG.md."
           fi
-          gh release create "$TAG" --title "$TAG" --notes "$NOTES"
+          if gh api --include "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" >/tmp/know-code-release.response 2>/tmp/know-code-release.err; then
+            gh release edit "$TAG" --title "$TAG" --notes "$NOTES"
+          elif head -n 1 /tmp/know-code-release.response | grep -Eq '^HTTP/[^ ]+ 404( |$)'; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --notes "$NOTES"
+          else
+            cat /tmp/know-code-release.err >&2
+            exit 1
+          fi
+
+  deploy-docs:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+      queue: max
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Verify main still declares this release
+        run: |
+          [[ "$(node -p 'require("./website/versions.json")[0]')" == "${GITHUB_REF_NAME#v}" ]]
+          node scripts/check-release-docs-provenance.mjs "${GITHUB_REF_NAME}" HEAD
+
+      - name: Build current docs
+        env:
+          UMAMI_WEBSITE_ID: ${{ vars.UMAMI_WEBSITE_ID }}
+        run: |
+          npm install
+          npm run build:docs
+
+      - name: Upload current docs artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-${{ github.run_attempt }}
+          path: website/build
+          include-hidden-files: true
+
+      - name: Confirm main did not advance before deployment
+        run: |
+          git fetch origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]]
+
+      - name: Deploy frozen release docs
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}

@@ -5,9 +5,6 @@ name: docs
 on:
   push:
     branches: [main]
-    paths:
-      - "website/**"
-      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,13 +12,54 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
-  build:
+  published-release:
     runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.release.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - id: release
+        run: |
+          VERSION="$(node -p 'require("./website/versions.json")[0]')"
+          verify_provenance() {
+            npm view "@chtnnh/know-code@${VERSION}" dist.attestations --json >/tmp/know-code-attestations.json || return 1
+            node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")); if (!value || typeof value !== "object" || !value.provenance || typeof value.provenance !== "object" || value.provenance.predicateType !== "https://slsa.dev/provenance/v1") process.exit(1)' < /tmp/know-code-attestations.json || return 1
+            VERIFY_DIR="$(mktemp -d)" || return 1
+            trap 'rm -rf "${VERIFY_DIR}"' RETURN
+            (cd "${VERIFY_DIR}" && npm init --yes >/dev/null) || return 1
+            npm install --prefix "${VERIFY_DIR}" --ignore-scripts "@chtnnh/know-code@${VERSION}" || return 1
+            npm audit signatures --prefix "${VERIFY_DIR}" --json || return 1
+          }
+          if npm view "@chtnnh/know-code@${VERSION}" gitHead --json >/tmp/know-code-version.json 2>/tmp/know-code-version.err; then
+            PUBLISHED_GIT_HEAD="$(node -e 'const fs = require("node:fs"); const value = JSON.parse(fs.readFileSync(0, "utf8")); if (typeof value !== "string" || !/^[0-9a-f]{40}$/i.test(value)) process.exit(1); process.stdout.write(value)' < /tmp/know-code-version.json)"
+            verify_provenance
+            git fetch origin main --tags
+            TAG_GIT_HEAD="$(git rev-parse "v${VERSION}^{commit}")"
+            git merge-base --is-ancestor "${TAG_GIT_HEAD}" origin/main
+            [[ "${PUBLISHED_GIT_HEAD}" == "${TAG_GIT_HEAD}" ]]
+            node scripts/check-release-docs-provenance.mjs "v${VERSION}" "${GITHUB_SHA}"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif grep -q "E404" /tmp/know-code-version.err; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            cat /tmp/know-code-version.err >&2
+            exit 1
+          fi
+
+  deploy:
+    needs: published-release
+    if: needs.published-release.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+      queue: max
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v5
 
@@ -40,16 +78,17 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
+          name: github-pages-${{ github.run_attempt }}
           path: website/build
           # v4+ excludes dotfiles by default; Docusaurus needs .nojekyll.
           include-hidden-files: true
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
+      - name: Confirm this is still main's latest commit
+        run: |
+          git fetch origin main
+          [[ "${GITHUB_SHA}" == "$(git rev-parse origin/main)" ]]
+
+      - name: Deploy Pages
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
