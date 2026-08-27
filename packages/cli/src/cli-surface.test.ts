@@ -6,7 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +36,11 @@ import {
 } from "./test-helpers.js";
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "index.js");
+const CLI_VERSION = (
+  JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf8"),
+  ) as { version: string }
+).version;
 
 interface CliResult {
   status: number;
@@ -72,13 +77,13 @@ function setupRepo(root: string, cfg = liteConfig()) {
 }
 
 describe("cli surface (spawned)", () => {
-  it("version matches the release", () => {
+  it("version matches the CLI package manifest", () => {
     const { root, cleanup } = withTempRepo("kc-cli-ver-");
     try {
       setupRepo(root);
       const r = kc(root, ["version"]);
       assert.equal(r.status, 0);
-      assert.match(r.stdout, /0\.3\.0/);
+      assert.equal(r.stdout.trim(), CLI_VERSION);
     } finally {
       cleanup();
     }

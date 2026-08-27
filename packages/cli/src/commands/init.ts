@@ -10,7 +10,7 @@ import { findGitRoot, knowCodeDir } from "../paths.js";
 import { DEFAULT_CONFIG, isLevel, isRangeMode, isRangeSealMode, type Config } from "../types.js";
 
 const DOCS = "https://kc.chtnnhfoundation.org";
-const ACTION_REF = "chtnnh/know-code/action@v0.3.0";
+const ACTION_REF = "chtnnh/know-code/action@v0.3.1";
 
 export function consumerWorkflowYaml(baseBranch: string): string {
   // PR: checkout the tip (not pull/N/merge). Push: walk github.event.before..HEAD.

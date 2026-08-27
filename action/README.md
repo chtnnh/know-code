@@ -21,13 +21,13 @@ on:
     fetch-depth: 0
     ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-- uses: chtnnh/know-code/action@v0.3.0
+- uses: chtnnh/know-code/action@v0.3.1
   with:
     base-branch: main
     from: ${{ github.event_name == 'push' && github.event.before || '' }}
     require-all: false
     require-range-trailers: false
-    version: "^0.3.0"
+    version: "^0.3.1"
 ```
 
 All-zeros `github.event.before` (new branch) skips the walk.
@@ -40,7 +40,7 @@ All-zeros `github.event.before` (new branch) skips the walk.
 | `from` | _(empty)_ | Previous tip for push jobs (`github.event.before`). Empty on `pull_request`. |
 | `require-all` | `false` | Stricter verify messaging |
 | `require-range-trailers` | `false` | Every commit in range must have trailer (rewrite teams; PR path) |
-| `version` | `^0.3.0` | npm version when not building from monorepo checkout |
+| `version` | `^0.3.1` | npm version when not building from monorepo checkout |
 
 ## Quick add
 

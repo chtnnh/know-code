@@ -1,6 +1,6 @@
 {
   "name": "@chtnnh/know-code",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Gate git push / PR creation until the human passes a comprehension quiz about the diff",
   "type": "module",
   "bin": {

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.1
+
+### Fixes
+- Fix the Umami proxy Worker’s script and event request forwarding, including a cache-versioned loader so updated upstream scripts do not depend on a manual Cloudflare cache purge.
+- Make push verification walk stacked landed runs against their historical tree pairs, preserving grounded trailer verification after merge commits.
+- Harden range-seal binding and status diagnostics so signed receipts stay tied to the correct head and explain stale state precisely.
+
+### Release safety
+- Verify that the pushed `v…` tag exactly matches the CLI package version before npm publication or GitHub Release creation.
+
 ### Umami proxy provision
 - **Deploy the Worker before binding `UMAMI_ORIGIN`.** wrangler-action’s `secrets:` input ran `secret bulk` first, which fails when the Worker does not exist yet — `wrangler.jsonc` still listed the `/s/*` route, so git looked provisioned while nothing was uploaded. CI now deploys, then `secret put`.
 - PRs that touch the proxy run unit tests + `wrangler deploy --dry-run`; only `main` / `workflow_dispatch` deploy.

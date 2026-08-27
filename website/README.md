@@ -14,7 +14,7 @@ npm run build:docs
 npm run start -w website
 ```
 
-Deployed by [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) to GitHub Pages on pushes to `main` that touch `website/**` (and `workflow_dispatch`). Custom domain: `static/CNAME` → `kc.chtnnhfoundation.org`.
+Deployed by [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) to GitHub Pages on every push to `main` (and `workflow_dispatch`). Custom domain: `static/CNAME` → `kc.chtnnhfoundation.org`.
 
 ## Versions
 
@@ -26,7 +26,7 @@ Deployed by [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) to Git
 
 The navbar dropdown switches versions. HEAD is labeled and bannered as unreleased; it is not the default.
 
-Cut a new docs version **when you tag a release whose docs actually changed** (skip patch-only releases):
+Cut a new docs version for every npm release:
 
 ```bash
 npm run docs:version -w website -- 0.4.0
