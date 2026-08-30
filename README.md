@@ -7,7 +7,6 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-339933?logo=nodedotjs&logoColor=white)](https://www.npmjs.com/package/@chtnnh/know-code)
 [![License](https://img.shields.io/github/license/chtnnh/know-code)](https://github.com/chtnnh/know-code/blob/main/LICENSE)
 [![Human comprehension gate](https://img.shields.io/badge/AI_changes-human%20comprehension%20gate-6f42c1)](https://kc.chtnnhfoundation.org/docs/how-it-works)
-[![npm downloads](https://img.shields.io/npm/dm/%40chtnnh/know-code?label=downloads)](https://www.npmjs.com/package/@chtnnh/know-code)
 
 Cross-harness [Agent Skill](https://agentskills.io) + CLI that blocks `git commit`, `git push`, and PR creation until **you** pass a comprehension quiz about the diff. The agent writes the quiz and proposes your grade — **you** answer in the browser and seal the gate. Not self-scored.
 
